@@ -127,86 +127,71 @@ public class HLSDistributionServiceImplTest {
   }
 
   @Test
-  public void testPartialDistribution() throws Exception {
+  public void testTrackDistribution() throws Exception {
     // Distribute only some of the elements in the mediapackage
-    Job job1 = service.distribute(mp, "track-1"); // "catalog-2" and "notes" are
-                                                  // not to be distributed
-    Job job2 = service.distribute(mp, "catalog-1"); // "catalog-2" and "notes"
-                                                    // are not to be
-                                                    // distributed
+    Job job1 = service.distribute(mp, "track-1"); // "track-1" should be distributed
+    JobBarrier jobBarrier = new JobBarrier(serviceRegistry, 500, job1);
+    jobBarrier.waitForJobs();
+
+    File mpDir = new File(distributionRoot, mp.getIdentifier().compact());
+    Assert.assertTrue(mpDir.exists());
+    File mediaDir = new File(mpDir, "track-1");
+    Assert.assertTrue(mediaDir.exists());
+    Assert.assertTrue(new File(mediaDir, "media.m3u8").exists()); // HLS playlist should have been created
+    Assert.assertTrue(new File(mediaDir, "media-000.ts").exists()); // HLS segment files should have been created
+  }
+
+  @Test
+  public void testTrackRetract() throws Exception {
+    int elementCount = mp.getElements().length;
+
+    // Distribute the mediapackage and all of its elements
+    Job job1 = service.distribute(mp, "track-1");
+    JobBarrier jobBarrier = new JobBarrier(serviceRegistry, 500, job1);
+    jobBarrier.waitForJobs();
+
+    // Add the new elements to the mediapackage
+    mp.add(MediaPackageElementParser.getFromXml(job1.getPayload()));
+
+    File mpDir = new File(distributionRoot, mp.getIdentifier().compact());
+    File mediaDir = new File(mpDir, "track-1");
+    Assert.assertTrue(mediaDir.exists());
+    Assert.assertTrue(new File(mediaDir, "media.m3u8").exists()); // HLS playlist should have been created
+    Assert.assertTrue(new File(mediaDir, "media-000.ts").exists()); // HLS segment files should have been created
+
+    // Now retract the mediapackage and ensure that the distributed files have been removed
+    Job job5 = service.retract(mp, "track-1");
+    jobBarrier = new JobBarrier(serviceRegistry, 500, job5);
+    jobBarrier.waitForJobs();
+
+    // Remove the distributed elements from the mediapackage
+    mp.remove(MediaPackageElementParser.getFromXml(job5.getPayload()));
+
+    Assert.assertEquals(elementCount, mp.getElements().length);
+    Assert.assertNotNull(mp.getElementById("track-1"));
+
+    Assert.assertFalse(service.getDistributionFile(mp, mp.getElementById("track-1")).isFile());
+    Assert.assertFalse(new File(mediaDir, "media.m3u8").exists()); // HLS playlist should have been created
+    Assert.assertFalse(new File(mediaDir, "media-000.ts").exists()); // HLS segment files should have been created
+  }
+
+  @Test
+  public void testOnlyTrackDistribution() throws Exception {
+    // Distribute only track elements in the mediapackage
+    Job job1 = service.distribute(mp, "track-1"); // "track-1" should be distributed
+    Job job2 = service.distribute(mp, "catalog-1"); // "catalog-1" should NOT be distributed
     JobBarrier jobBarrier = new JobBarrier(serviceRegistry, 500, job1, job2);
     jobBarrier.waitForJobs();
 
     File mpDir = new File(distributionRoot, mp.getIdentifier().compact());
     Assert.assertTrue(mpDir.exists());
     File mediaDir = new File(mpDir, "track-1");
+    Assert.assertTrue(mediaDir.exists());
     File metadataDir = new File(mpDir, "catalog-1");
-    File attachmentsDir = new File(mpDir, "notes");
-    Assert.assertTrue(mediaDir.exists());
-    Assert.assertTrue(metadataDir.exists());
-    Assert.assertFalse(attachmentsDir.exists());
-    Assert.assertTrue(new File(mediaDir, "media.mov").exists()); // the filenames are changed to reflect the element ID
-    Assert.assertTrue(new File(metadataDir, "dublincore.xml").exists());
-    Assert.assertFalse(new File(metadataDir, "mpeg7.xml").exists());
-    Assert.assertFalse(new File(attachmentsDir, "attachment.txt").exists());
+    Assert.assertFalse(metadataDir.exists());
+
+    Assert.assertTrue(new File(mediaDir, "media.m3u8").exists()); // HLS playlist should have been created
+    Assert.assertTrue(new File(mediaDir, "media-000.ts").exists()); // HLS segment files should have been created
+    Assert.assertFalse(new File(metadataDir, "dublincore.xml").exists());
   }
-
-  @Test
-  public void testRetract() throws Exception {
-    int elementCount = mp.getElements().length;
-
-    // Distribute the mediapackage and all of its elements
-    Job job1 = service.distribute(mp, "track-1");
-    Job job2 = service.distribute(mp, "catalog-1");
-    Job job3 = service.distribute(mp, "catalog-2");
-    Job job4 = service.distribute(mp, "notes");
-    JobBarrier jobBarrier = new JobBarrier(serviceRegistry, 500, job1, job2, job3, job4);
-    jobBarrier.waitForJobs();
-
-    // Add the new elements to the mediapackage
-    mp.add(MediaPackageElementParser.getFromXml(job1.getPayload()));
-    mp.add(MediaPackageElementParser.getFromXml(job2.getPayload()));
-    mp.add(MediaPackageElementParser.getFromXml(job3.getPayload()));
-    mp.add(MediaPackageElementParser.getFromXml(job4.getPayload()));
-
-    File mpDir = new File(distributionRoot, mp.getIdentifier().compact());
-    File mediaDir = new File(mpDir, "track-1");
-    File metadata1Dir = new File(mpDir, "catalog-1");
-    File metadata2Dir = new File(mpDir, "catalog-2");
-    File attachmentsDir = new File(mpDir, "notes");
-    Assert.assertTrue(mediaDir.exists());
-    Assert.assertTrue(metadata1Dir.exists());
-    Assert.assertTrue(metadata2Dir.exists());
-    Assert.assertTrue(attachmentsDir.exists());
-    Assert.assertTrue(new File(mediaDir, "media.mov").exists()); // the filenames are changed to reflect the element ID
-    Assert.assertTrue(new File(metadata1Dir, "dublincore.xml").exists());
-    Assert.assertTrue(new File(metadata2Dir, "mpeg7.xml").exists());
-    Assert.assertTrue(new File(attachmentsDir, "attachment.txt").exists());
-
-    // Now retract the mediapackage and ensure that the distributed files have been removed
-    Job job5 = service.retract(mp, "track-1");
-    Job job6 = service.retract(mp, "catalog-1");
-    Job job7 = service.retract(mp, "catalog-2");
-    Job job8 = service.retract(mp, "notes");
-    jobBarrier = new JobBarrier(serviceRegistry, 500, job5, job6, job7, job8);
-    jobBarrier.waitForJobs();
-
-    // Remove the distributed elements from the mediapackage
-    mp.remove(MediaPackageElementParser.getFromXml(job5.getPayload()));
-    mp.remove(MediaPackageElementParser.getFromXml(job6.getPayload()));
-    mp.remove(MediaPackageElementParser.getFromXml(job7.getPayload()));
-    mp.remove(MediaPackageElementParser.getFromXml(job8.getPayload()));
-
-    Assert.assertEquals(elementCount, mp.getElements().length);
-    Assert.assertNotNull(mp.getElementById("track-1"));
-    Assert.assertNotNull(mp.getElementById("catalog-1"));
-    Assert.assertNotNull(mp.getElementById("catalog-2"));
-    Assert.assertNotNull(mp.getElementById("notes"));
-
-    Assert.assertFalse(service.getDistributionFile(mp, mp.getElementById("track-1")).isFile());
-    Assert.assertFalse(service.getDistributionFile(mp, mp.getElementById("catalog-1")).isFile());
-    Assert.assertFalse(service.getDistributionFile(mp, mp.getElementById("catalog-2")).isFile());
-    Assert.assertFalse(service.getDistributionFile(mp, mp.getElementById("notes")).isFile());
-  }
-
 }
