@@ -16,8 +16,13 @@
 
 package org.opencastproject.distribution.hls;
 
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.FilenameUtils;
+import org.apache.http.HttpResponse;
+import org.apache.http.client.methods.HttpHead;
 import org.opencastproject.distribution.api.DistributionException;
 import org.opencastproject.distribution.api.DistributionService;
+//import org.opencastproject.distribution.api.DownloadDistributionService;
 import org.opencastproject.job.api.AbstractJobProducer;
 import org.opencastproject.job.api.Job;
 import org.opencastproject.mediapackage.MediaPackage;
@@ -25,9 +30,9 @@ import org.opencastproject.mediapackage.MediaPackageElement;
 import org.opencastproject.mediapackage.MediaPackageElementParser;
 import org.opencastproject.mediapackage.MediaPackageException;
 import org.opencastproject.mediapackage.MediaPackageParser;
-import org.opencastproject.mediapackage.Track;
 import org.opencastproject.security.api.OrganizationDirectoryService;
 import org.opencastproject.security.api.SecurityService;
+import org.opencastproject.security.api.TrustedHttpClient;
 import org.opencastproject.security.api.UserDirectoryService;
 import org.opencastproject.serviceregistry.api.ServiceRegistry;
 import org.opencastproject.serviceregistry.api.ServiceRegistryException;
@@ -36,30 +41,11 @@ import org.opencastproject.util.NotFoundException;
 import org.opencastproject.util.PathSupport;
 import org.opencastproject.util.UrlSupport;
 import org.opencastproject.workspace.api.Workspace;
-
-import org.apache.commons.httpclient.Credentials;
-import org.apache.commons.httpclient.HttpClient;
-import org.apache.commons.httpclient.HttpException;
-import org.apache.commons.httpclient.HttpMethod;
-import org.apache.commons.httpclient.HttpStatus;
-import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
-import org.apache.commons.httpclient.NameValuePair;
-import org.apache.commons.httpclient.UsernamePasswordCredentials;
-import org.apache.commons.httpclient.auth.AuthScope;
-import org.apache.commons.httpclient.methods.DeleteMethod;
-import org.apache.commons.httpclient.methods.GetMethod;
-import org.apache.commons.httpclient.methods.PostMethod;
-import org.apache.commons.httpclient.methods.PutMethod;
-import org.apache.commons.httpclient.methods.multipart.StringPart;
-import org.apache.commons.httpclient.methods.multipart.MultipartRequestEntity;
-import org.apache.commons.httpclient.methods.multipart.Part;
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.FilenameUtils;
-import org.apache.commons.lang.StringUtils;
 import org.osgi.service.component.ComponentContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.servlet.http.HttpServletResponse;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
@@ -71,24 +57,39 @@ import java.util.List;
 /**
  * Distributes media to the local media delivery directory.
  */
-public class HLSDistributionService extends AbstractJobProducer implements DistributionService {
+public class HLSDistributionServiceImpl extends AbstractJobProducer implements DistributionService/*, DownloadDistributionService*/ {
 
   /** Logging facility */
-  private static final Logger logger = LoggerFactory.getLogger(HLSDistributionService.class);
-
-  /** Receipt type */
-  public static final String JOB_TYPE = "org.opencastproject.distribution.hls";
+  private static final Logger logger = LoggerFactory.getLogger(HLSDistributionServiceImpl.class);
 
   /** List of available operations on jobs */
   private enum Operation {
     Distribute, Retract
-  };
+  }
+
+  /** Receipt type */
+  public static final String JOB_TYPE = "org.opencastproject.distribution.hls";
+
+  /** Default distribution directory */
+  public static final String DEFAULT_DISTRIBUTION_DIR = "opencast" + File.separator + "static";
+
+  /** Timeout in millis for checking distributed file request */
+  private static final long TIMEOUT = 10000L;
+
+  /** Interval time in millis for checking distributed file request */
+  private static final long INTERVAL = 300L;
+
+  /** Path to the distribution directory */
+  protected File distributionDirectory = null;
+
+  /** this media hls service's base URL */
+  protected String serviceUrl = null;
+
+  /** The remote service registry */
+  protected ServiceRegistry serviceRegistry = null;
 
   /** The workspace reference */
   protected Workspace workspace = null;
-
-  /** The service registry */
-  protected ServiceRegistry serviceRegistry = null;
 
   /** The security service */
   protected SecurityService securityService = null;
@@ -99,72 +100,51 @@ public class HLSDistributionService extends AbstractJobProducer implements Distr
   /** The organization directory service */
   protected OrganizationDirectoryService organizationDirectoryService = null;
 
-  /** The distribution directory */
-  protected File distributionDirectory = null;
-
-  /** The base URL for hls */
-  protected String hlsUrl = null;
-
-  /** The admin username for hls */
-  protected String hlsAdminUsername = null;
-
-  /** The admin password for hls */
-  protected String hlsAdminPassword = null;
+  /** The trusted HTTP client */
+  private TrustedHttpClient trustedHttpClient;
 
   /**
    * Creates a new instance of the hls distribution service.
    */
-  public HLSDistributionService() {
+  public HLSDistributionServiceImpl() {
     super(JOB_TYPE);
   }
 
+  /**
+   * Activate method for this OSGi service implementation.
+   * 
+   * @param cc
+   *          the OSGi component context
+   */
   protected void activate(ComponentContext cc) {
-    // Get the configured hls and server URLs
-    if (cc != null) {
-      hlsUrl = StringUtils.trimToNull(cc.getBundleContext().getProperty("org.opencastproject.hls.url"));
-      if (hlsUrl == null)
-        logger.warn("HLS url was not set (org.opencastproject.hls.url)");
-      else
-        logger.info("hls url is {}", hlsUrl);
+    serviceUrl = cc.getBundleContext().getProperty("org.opencastproject.hls.url");
+    if (serviceUrl == null)
+      throw new IllegalStateException("HLS url must be set (org.opencastproject.hls.url)");
 
-      hlsAdminUsername = StringUtils.trimToNull(cc.getBundleContext().getProperty("org.opencastproject.hls.admin.username"));
-      if (hlsAdminUsername == null)
-        logger.warn("HLS admin username was not set (org.opencastproject.hls.admin.username)");
-      else
-        logger.info("hls admin username is {}", hlsAdminUsername);
-
-      hlsAdminPassword = StringUtils.trimToNull(cc.getBundleContext().getProperty("org.opencastproject.hls.admin.password"));
-      if (hlsAdminPassword == null)
-        logger.warn("HLS admin password was not set (org.opencastproject.hls.admin.password)");
-      else
-        logger.info("hls admin password is {}", hlsAdminPassword);
-    }
+    String ccDistributionDirectory = cc.getBundleContext().getProperty("org.opencastproject.hls.directory");
+    if (ccDistributionDirectory == null)
+      throw new IllegalStateException("Distribution directory must be set (org.opencastproject.hls.directory)");
+    this.distributionDirectory = new File(ccDistributionDirectory);
+    logger.info("HLS distribution directory is {}", distributionDirectory);
   }
 
-  /**
-   * {@inheritDoc}
-   * 
-   * @see org.opencastproject.distribution.api.DistributionService#distribute(MediaPackage, java.lang.String)
-   */
   @Override
-  public Job distribute(MediaPackage mediapackage, String elementId) throws DistributionException,
-          MediaPackageException {
+  public Job distribute(MediaPackage mediapackage, String elementId) throws DistributionException, MediaPackageException {
+    return distribute(mediapackage, elementId, true);
+  }
 
+  public Job distribute(MediaPackage mediapackage, String elementId, boolean checkAvailability)
+          throws DistributionException, MediaPackageException {
     if (mediapackage == null)
       throw new MediaPackageException("Mediapackage must be specified");
     if (elementId == null)
       throw new MediaPackageException("Element ID must be specified");
-
-    if (StringUtils.isBlank(hlsUrl))
-      throw new IllegalStateException("HLS url must be set (org.opencastproject.hls.url)");
-    if (StringUtils.isBlank(hlsAdminUsername))
-      throw new IllegalStateException("HLS admin username must be set (org.opencastproject.hls.admin.username)");
-    if (StringUtils.isBlank(hlsAdminPassword))
-      throw new IllegalStateException("HLS admin password must be set (org.opencastproject.hls.admin.password)");
-
     try {
-      return serviceRegistry.createJob(JOB_TYPE, Operation.Distribute.toString(),
-              Arrays.asList(MediaPackageParser.getAsXml(mediapackage), elementId));
+      return serviceRegistry.createJob(JOB_TYPE,
+                                       Operation.Distribute.toString(),
+                                       Arrays.asList(MediaPackageParser.getAsXml(mediapackage),
+                                                     elementId,
+                                                     Boolean.toString(checkAvailability)));
     } catch (ServiceRegistryException e) {
       throw new DistributionException("Unable to create a job", e);
     }
@@ -173,12 +153,33 @@ public class HLSDistributionService extends AbstractJobProducer implements Distr
   /**
    * Distributes the mediapackage's element to the location that is returned by the concrete implementation. In
    * addition, a representation of the distributed element is added to the mediapackage.
-   * 
-   * @see org.opencastproject.distribution.api.DistributionService#distribute(String, MediaPackageElement)
+   *
+   * @see org.opencastproject.distribution.api.DistributionService#distribute(org.opencastproject.mediapackage.MediaPackage,
+   *      String)
+   * @throws org.opencastproject.distribution.api.DistributionException
+   *           in case of an error
    */
-  protected MediaPackageElement distribute(Job job, MediaPackage mediapackage, String elementId)
+  protected MediaPackageElement distribute(Job job, MediaPackage mediapackage, String elementId, boolean checkAvailability)
           throws DistributionException {
+    return distributeElement(mediapackage, elementId, checkAvailability);
+  }
 
+  /**
+   * Distribute a Mediapackage element to the hls distribution service.
+   * 
+   * @param mediapackage
+   *          The media package that contains the element to distribute.
+   * @param elementId
+   *          The id of the element that should be distributed contained within the media package.
+   * @param checkAvailability
+   *          Check the availability of the distributed element via http.
+   * @return A reference to the MediaPackageElement that has been distributed.
+   * @throws DistributionException
+   *           Thrown if the parent directory of the MediaPackageElement cannot be created, if the MediaPackageElement
+   *           cannot be copied or another unexpected exception occurs.
+   */
+  public MediaPackageElement distributeElement(MediaPackage mediapackage, String elementId, boolean checkAvailability)
+          throws DistributionException {
     if (mediapackage == null)
       throw new IllegalArgumentException("Mediapackage must be specified");
     if (elementId == null)
@@ -190,63 +191,62 @@ public class HLSDistributionService extends AbstractJobProducer implements Distr
     // Make sure the element exists
     if (mediapackage.getElementById(elementId) == null)
       throw new IllegalStateException("No element " + elementId + " found in mediapackage");
-    
+
     try {
-      // The hls server only supports tracks
-      if (!(element instanceof Track)) {
-        return null;
+      File source;
+      try {
+        source = workspace.get(element.getURI());
+      } catch (NotFoundException e) {
+        throw new DistributionException("Unable to find " + element.getURI() + " in the workspace", e);
+      } catch (IOException e) {
+        throw new DistributionException("Error loading " + element.getURI() + " from the workspace", e);
       }
+      File destination = getDistributionFile(mediapackage, element);
 
-        String parentpid = mediapackage.getTitle();
-        if (parentpid == null) {
-          throw new DistributionException("Could not find HLS pid in mediapackage.");
-        }
+      // Put the file in place
+      try {
+        FileUtils.forceMkdir(destination.getParentFile());
+      } catch (IOException e) {
+        throw new DistributionException("Unable to create " + destination.getParentFile(), e);
+      }
+      logger.info("Distributing {} to {}", elementId, destination);
 
-        logger.trace("Found parent pid: {}", parentpid);
-
-        try{
-		String url = UrlSupport.concat(new String[] { hlsUrl, "derivatives" });
-                MultiThreadedHttpConnectionManager mgr = new MultiThreadedHttpConnectionManager();
-                HttpClient client = new HttpClient(mgr);
-		Credentials defaultcreds = new UsernamePasswordCredentials(hlsAdminUsername, hlsAdminPassword);
-		client.getState().setCredentials(AuthScope.ANY, defaultcreds);
-		client.getParams().setAuthenticationPreemptive(true);
-
-                PostMethod post = new PostMethod(url);
-		post.setDoAuthentication(true);
-
-		Part[] parts = {
-                        new StringPart("stream_url", element.getURI().toString()),
-                        new StringPart("master", parentpid),
-		};
-		post.setRequestEntity(
-			new MultipartRequestEntity(parts, post.getParams())
-		);
-                int status = client.executeMethod(post);
-                logger.debug("Got status: " + status);
-                logger.trace("Got response body: " + post.getResponseBodyAsString());
-        }catch(IOException e){
-                logger.debug("Exception distributing to HLS: " + e.getCause());
-                throw new DistributionException("Error distributing to HLS instance", e);
-        }
-
-      logger.info("Distributed {} to hls", elementId);
+      try {
+        FileSupport.link(source, destination, true);
+      } catch (IOException e) {
+        throw new DistributionException("Unable to copy " + source + " to " + destination, e);
+      }
 
       // Create a representation of the distributed file in the mediapackage
       MediaPackageElement distributedElement = (MediaPackageElement) element.clone();
-//TODO Create and set a valid distribution URI
-/*
       try {
         distributedElement.setURI(getDistributionUri(mediaPackageId, element));
       } catch (URISyntaxException e) {
         throw new DistributionException("Distributed element produces an invalid URI", e);
       }
-*/
       distributedElement.setIdentifier(null);
 
       logger.info("Finished distribution of {}", element);
-      return distributedElement;
+      URI uri = distributedElement.getURI();
+      long now = 0L;
+      while (checkAvailability) {
+        HttpResponse response = trustedHttpClient.execute(new HttpHead(uri));
+        if (response.getStatusLine().getStatusCode() == HttpServletResponse.SC_OK)
+          break;
 
+        if (now < TIMEOUT) {
+          try {
+            Thread.sleep(INTERVAL);
+            now += INTERVAL;
+            continue;
+          } catch (Exception e) {
+            throw new RuntimeException(e);
+          }
+        }
+        logger.warn("Status code of distributed file {}: {}", uri, response.getStatusLine().getStatusCode());
+        throw new DistributionException("Unable to load distributed file " + uri.toString());
+      }
+      return distributedElement;
     } catch (Exception e) {
       logger.warn("Error distributing " + element, e);
       if (e instanceof DistributionException) {
@@ -257,25 +257,12 @@ public class HLSDistributionService extends AbstractJobProducer implements Distr
     }
   }
 
-  /**
-   * {@inheritDoc}
-   * 
-   * @see org.opencastproject.distribution.api.DistributionService#retract(org.opencastproject.mediapackage.MediaPackage,
-   *      java.lang.String)
-   */
+  @Override
   public Job retract(MediaPackage mediaPackage, String elementId) throws DistributionException {
     if (mediaPackage == null)
       throw new IllegalArgumentException("Mediapackage must be specified");
     if (elementId == null)
       throw new IllegalArgumentException("Element ID must be specified");
-
-    if (StringUtils.isBlank(hlsUrl))
-      throw new IllegalStateException("HLS url must be set (org.opencastproject.hls.url)");
-    if (StringUtils.isBlank(hlsAdminUsername))
-      throw new IllegalStateException("HLS admin username must be set (org.opencastproject.hls.admin.username)");
-    if (StringUtils.isBlank(hlsAdminPassword))
-      throw new IllegalStateException("HLS admin password must be set (org.opencastproject.hls.admin.password)");
-
     try {
       List<String> arguments = new ArrayList<String>();
       arguments.add(MediaPackageParser.getAsXml(mediaPackage));
@@ -287,7 +274,10 @@ public class HLSDistributionService extends AbstractJobProducer implements Distr
   }
 
   /**
-   * Retracts the mediapackage with the given identifier from the distribution channel.
+   * Retract a media package element from the distribution channel. The retracted element must not necessarily be the
+   * one given as parameter <code>elementId</code>. Instead, the element's distribution URI will be calculated and then
+   * in turn be matched against each element of the package. This way you are able to retract elements by providing the
+   * "original" element here.
    * 
    * @param job
    *          the associated job
@@ -296,6 +286,8 @@ public class HLSDistributionService extends AbstractJobProducer implements Distr
    * @param elementId
    *          the element identifier
    * @return the retracted element or <code>null</code> if the element was not retracted
+   * @throws org.opencastproject.distribution.api.DistributionException
+   *           in case of an error
    */
   protected MediaPackageElement retract(Job job, MediaPackage mediapackage, String elementId)
           throws DistributionException {
@@ -310,15 +302,10 @@ public class HLSDistributionService extends AbstractJobProducer implements Distr
     if (element == null)
       throw new IllegalStateException("No element " + elementId + " found in mediapackage");
 
-        //TODO implement this!!
-        logger.info("Nothing done...this method is not implemented yet.");
-
-	return element;
-/*
     // Find the element that has been created as part of the distribution process
     String mediaPackageId = mediapackage.getIdentifier().compact();
     URI distributedURI = null;
-    MediaPackageElement distributedElement = null; 
+    MediaPackageElement distributedElement = null;
     try {
       distributedURI = getDistributionUri(mediaPackageId, element);
       for (MediaPackageElement e : mediapackage.getElements()) {
@@ -334,20 +321,24 @@ public class HLSDistributionService extends AbstractJobProducer implements Distr
     // Has this element been distributed?
     if (distributedElement == null)
       return null;
-    
+
     String mediapackageId = mediapackage.getIdentifier().compact();
     try {
 
       File mediapackageDir = getMediaPackageDirectory(mediapackageId);
       File elementDir = getDistributionFile(mediapackage, element);
 
+      logger.info("Retracting element {} from {}", distributedElement, elementDir);
+
       // Does the file exist? If not, the current element has not been distributed to this channel
       // or has been removed otherwise
-      if (!elementDir.exists())
+      if (!elementDir.exists()) {
+        logger.warn("Unable to delete element from {}", elementDir);
         return distributedElement;
+      }
 
       // Try to remove the file and - if possible - the parent folder
-      FileUtils.forceDelete(elementDir);
+      FileUtils.forceDelete(elementDir.getParentFile());
       if (mediapackageDir.list().length == 0) {
         FileSupport.delete(mediapackageDir);
       }
@@ -363,56 +354,7 @@ public class HLSDistributionService extends AbstractJobProducer implements Distr
         throw new DistributionException(e);
       }
     }
-*/
 
-  }
-
-  /**
-   * Gets the destination file to copy the contents of a mediapackage element.
-   * 
-   * @param mediaPackage
-   *          the media package
-   * @param element
-   *          The mediapackage element being distributed
-   * @return The file to copy the content to
-   */
-  protected File getDistributionFile(MediaPackage mediaPackage, MediaPackageElement element) {
-    String elementId = element.getIdentifier();
-    String fileName = FilenameUtils.getName(element.getURI().toString());
-    
-    String directoryName = distributionDirectory.getAbsolutePath();
-    String destinationFileName = PathSupport.concat(new String[] { directoryName,
-            mediaPackage.getIdentifier().compact(), elementId, fileName });
-    return new File(destinationFileName);
-  }
-
-  /**
-   * Gets the URI for the element to be distributed.
-   * 
-   * @param mediaPackageId
-   *          the mediapackage identifier
-   * @param element
-   *          The mediapackage element being distributed
-   * @return The resulting URI after distribution
-   * @throws URISyntaxException
-   *           if the concrete implementation tries to create a malformed uri
-   */
-  protected URI getDistributionUri(String mediaPackageId, MediaPackageElement element) throws URISyntaxException {
-    //TODO Implement this!
-    String elementId = element.getIdentifier();
-    String destinationURI = UrlSupport.concat(new String[] { hlsUrl, mediaPackageId, elementId });
-    return new URI(destinationURI);
-  }
-
-  /**
-   * Gets the directory containing the distributed files for this mediapackage.
-   * 
-   * @param mediaPackageId
-   *          the mediapackage ID
-   * @return the filesystem directory
-   */
-  protected File getMediaPackageDirectory(String mediaPackageId) {
-    return new File(distributionDirectory, mediaPackageId);
   }
 
   /**
@@ -431,7 +373,8 @@ public class HLSDistributionService extends AbstractJobProducer implements Distr
       String elementId = arguments.get(1);
       switch (op) {
         case Distribute:
-          MediaPackageElement distributedElement = distribute(job, mediapackage, elementId);
+          Boolean checkAvailability = Boolean.parseBoolean(arguments.get(2));
+          MediaPackageElement distributedElement = distribute(job, mediapackage, elementId, checkAvailability);
           return (distributedElement != null) ? MediaPackageElementParser.getAsXml(distributedElement) : null;
         case Retract:
           MediaPackageElement retractedElement = retract(job, mediapackage, elementId);
@@ -446,6 +389,53 @@ public class HLSDistributionService extends AbstractJobProducer implements Distr
     } catch (Exception e) {
       throw new ServiceRegistryException("Error handling operation '" + op + "'", e);
     }
+  }
+
+  /**
+   * Gets the destination file to copy the contents of a mediapackage element.
+   * 
+   * @param mediaPackage
+   *          the media package
+   * @param element
+   *          The mediapackage element being distributed
+   * @return The file to copy the content to
+   */
+  protected File getDistributionFile(MediaPackage mediaPackage, MediaPackageElement element) {
+    String elementId = element.getIdentifier();
+    String fileName = FilenameUtils.getName(element.getURI().toString());
+    String directoryName = distributionDirectory.getAbsolutePath();
+    String destinationFileName = PathSupport.concat(new String[] { directoryName,
+            mediaPackage.getIdentifier().compact(), elementId, fileName });
+    return new File(destinationFileName);
+  }
+
+  /**
+   * Gets the URI for the element to be distributed.
+   * 
+   * @param mediaPackageId
+   *          the mediapackage identifier
+   * @param element
+   *          The mediapackage element being distributed
+   * @return The resulting URI after distribution
+   * @throws URISyntaxException
+   *           if the concrete implementation tries to create a malformed uri
+   */
+  protected URI getDistributionUri(String mediaPackageId, MediaPackageElement element) throws URISyntaxException {
+    String elementId = element.getIdentifier();
+    String fileName = FilenameUtils.getName(element.getURI().toString());
+    String destinationURI = UrlSupport.concat(serviceUrl, mediaPackageId, elementId, fileName);
+    return new URI(destinationURI);
+  }
+
+  /**
+   * Gets the directory containing the distributed files for this mediapackage.
+   * 
+   * @param mediaPackageId
+   *          the mediapackage ID
+   * @return the filesystem directory
+   */
+  protected File getMediaPackageDirectory(String mediaPackageId) {
+    return new File(distributionDirectory, mediaPackageId);
   }
 
   /**
@@ -486,6 +476,16 @@ public class HLSDistributionService extends AbstractJobProducer implements Distr
    */
   public void setSecurityService(SecurityService securityService) {
     this.securityService = securityService;
+  }
+
+  /**
+   * Callback for setting the trusted HTTP client.
+   * 
+   * @param trustedHttpClient
+   *          the trusted HTTP client to set
+   */
+  public void setTrustedHttpClient(TrustedHttpClient trustedHttpClient) {
+    this.trustedHttpClient = trustedHttpClient;
   }
 
   /**
