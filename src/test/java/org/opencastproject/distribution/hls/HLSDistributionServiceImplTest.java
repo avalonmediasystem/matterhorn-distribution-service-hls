@@ -42,6 +42,7 @@ import org.opencastproject.security.api.User;
 import org.opencastproject.security.api.UserDirectoryService;
 import org.opencastproject.serviceregistry.api.ServiceRegistry;
 import org.opencastproject.serviceregistry.api.ServiceRegistryInMemoryImpl;
+import org.opencastproject.util.PathSupport;
 import org.opencastproject.util.UrlSupport;
 import org.opencastproject.workspace.api.Workspace;
 
@@ -128,6 +129,23 @@ public class HLSDistributionServiceImplTest {
   }
 
   @Test
+  public void testGetDistributionFile() throws Exception {
+    File destFile = service.getDistributionFile(mp, mp.getElementById("track-1"));
+    String expectedPath = PathSupport.concat(new String[] { distributionRoot.getAbsolutePath(),
+            mp.getIdentifier().compact(), "track-1", "media.m3u8" });
+
+    Assert.assertEquals(new File(expectedPath), destFile);
+  }
+
+  @Test
+  public void testGetDistributionUri() throws Exception {
+    URI distUri = service.getDistributionUri(mp.getIdentifier().compact(), mp.getElementById("track-1"));
+    String expectedUri = UrlSupport.concat(service.serviceUrl, mp.getIdentifier().compact(), "track-1", "media.m3u8");
+
+    Assert.assertEquals(new URI(expectedUri), distUri);
+  }
+
+  @Test
   public void testNonH264TrackDistribution() throws Exception {
     Job job1 = service.distribute(mp, "track-2"); // "track-2" should NOT be distributed
     JobBarrier jobBarrier = new JobBarrier(serviceRegistry, 500, job1);
@@ -157,9 +175,9 @@ public class HLSDistributionServiceImplTest {
 
     //Test that the HLS playlist was added as a delivery track
     MediaPackageElement mpe = MediaPackageElementParser.getFromXml(job1.getPayload());
-    Assert.assertEquals(mpe.getMimeType(), "application/x-mpegURL");    
-    Assert.assertEquals(mpe.getElementType(), MediaPackageElement.Type.Track);
-    Assert.assertEquals(mpe.getURI(), UrlSupport.concat(service.serviceUrl, mp.getIdentifier().compact(), mpe.getIdentifier(), "media.m3u8"));
+    Assert.assertEquals("application/x-mpegURL", mpe.getMimeType());
+    Assert.assertEquals(MediaPackageElement.Type.Track, mpe.getElementType());
+    Assert.assertEquals(UrlSupport.concat(service.serviceUrl, mp.getIdentifier().compact(), mpe.getIdentifier(), "media.m3u8"), mpe.getURI());
   }
 
   @Test

@@ -217,7 +217,7 @@ public class HLSDistributionServiceImpl extends AbstractJobProducer implements D
       }
       File destination = getDistributionFile(mediapackage, element);
 
-      // Put the file in place
+      // Make the directories to place the files into
       try {
         FileUtils.forceMkdir(destination.getParentFile());
       } catch (IOException e) {
@@ -225,11 +225,12 @@ public class HLSDistributionServiceImpl extends AbstractJobProducer implements D
       }
       logger.info("Distributing {} to {}", elementId, destination);
 
-      try {
-        FileSupport.link(source, destination, true);
-      } catch (IOException e) {
-        throw new DistributionException("Unable to copy " + source + " to " + destination, e);
-      }
+      // Do the HLS segmentation and m3u8 playlist generation
+//      try {
+//        FileSupport.link(source, destination, true);
+//      } catch (IOException e) {
+//        throw new DistributionException("Unable to copy " + source + " to " + destination, e);
+//      }
 
       // Create a representation of the distributed file in the mediapackage
       MediaPackageElement distributedElement = (MediaPackageElement) element.clone();
@@ -416,7 +417,7 @@ public class HLSDistributionServiceImpl extends AbstractJobProducer implements D
    */
   protected File getDistributionFile(MediaPackage mediaPackage, MediaPackageElement element) {
     String elementId = element.getIdentifier();
-    String fileName = FilenameUtils.getName(element.getURI().toString());
+    String fileName = FilenameUtils.getBaseName(element.getURI().toString()) + ".m3u8";
     String directoryName = distributionDirectory.getAbsolutePath();
     String destinationFileName = PathSupport.concat(new String[] { directoryName,
             mediaPackage.getIdentifier().compact(), elementId, fileName });
@@ -436,7 +437,7 @@ public class HLSDistributionServiceImpl extends AbstractJobProducer implements D
    */
   protected URI getDistributionUri(String mediaPackageId, MediaPackageElement element) throws URISyntaxException {
     String elementId = element.getIdentifier();
-    String fileName = FilenameUtils.getName(element.getURI().toString());
+    String fileName = FilenameUtils.getBaseName(element.getURI().toString()) + ".m3u8";
     String destinationURI = UrlSupport.concat(serviceUrl, mediaPackageId, elementId, fileName);
     return new URI(destinationURI);
   }
