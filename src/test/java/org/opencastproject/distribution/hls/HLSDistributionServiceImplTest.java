@@ -185,20 +185,15 @@ public class HLSDistributionServiceImplTest {
   @Test
   public void testOnlyTrackDistribution() throws Exception {
     // Distribute only track elements in the mediapackage
-    Job job1 = service.distribute(mp, "track-1"); // "track-1" should be distributed
-    Job job2 = service.distribute(mp, "catalog-1"); // "catalog-1" should NOT be distributed
-    JobBarrier jobBarrier = new JobBarrier(serviceRegistry, 500, job1, job2);
+    Job job = service.distribute(mp, "catalog-1"); // "catalog-1" should NOT be distributed
+    JobBarrier jobBarrier = new JobBarrier(serviceRegistry, 500, job);
     jobBarrier.waitForJobs();
 
     File mpDir = new File(distributionRoot, mp.getIdentifier().compact());
-    Assert.assertTrue(mpDir.exists());
-    File mediaDir = new File(mpDir, "track-1");
-    Assert.assertTrue(mediaDir.exists());
+    Assert.assertFalse(mpDir.exists());
     File metadataDir = new File(mpDir, "catalog-1");
     Assert.assertFalse(metadataDir.exists());
 
-    Assert.assertTrue(new File(mediaDir, "media.m3u8").exists()); // HLS playlist should have been created
-    Assert.assertTrue(new File(mediaDir, "media-000.ts").exists()); // HLS segment files should have been created
     Assert.assertFalse(new File(metadataDir, "dublincore.xml").exists());
   }
 }

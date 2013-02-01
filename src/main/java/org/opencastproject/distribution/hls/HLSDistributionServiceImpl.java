@@ -191,6 +191,12 @@ public class HLSDistributionServiceImpl extends AbstractJobProducer implements D
     // Make sure the element exists
     if (mediapackage.getElementById(elementId) == null)
       throw new IllegalStateException("No element " + elementId + " found in mediapackage");
+    // Streaming servers only deal with tracks
+    if (!MediaPackageElement.Type.Track.equals(element.getElementType())) {
+      logger.debug("Skipping {} {} for distribution to the streaming server", element.getElementType().toString()
+        .toLowerCase(), element.getIdentifier());
+      return null;
+    }
 
     try {
       File source;
