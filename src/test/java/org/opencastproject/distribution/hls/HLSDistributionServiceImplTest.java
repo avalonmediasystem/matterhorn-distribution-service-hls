@@ -128,6 +128,20 @@ public class HLSDistributionServiceImplTest {
   }
 
   @Test
+  public void testNonH264TrackDistribution() throws Exception {
+    Job job1 = service.distribute(mp, "track-2"); // "track-2" should NOT be distributed
+    JobBarrier jobBarrier = new JobBarrier(serviceRegistry, 500, job1);
+    jobBarrier.waitForJobs();
+
+    File mpDir = new File(distributionRoot, mp.getIdentifier().compact());
+    Assert.assertFalse(mpDir.exists());
+    File mediaDir = new File(mpDir, "track-2");
+    Assert.assertFalse(mediaDir.exists());
+    Assert.assertFalse(new File(mediaDir, "media.m3u8").exists()); // HLS playlist should have been created
+    Assert.assertFalse(new File(mediaDir, "media-000.ts").exists()); // HLS segment files should have been created
+  }
+
+  @Test
   public void testTrackDistribution() throws Exception {
     // Distribute only some of the elements in the mediapackage
     Job job1 = service.distribute(mp, "track-1"); // "track-1" should be distributed

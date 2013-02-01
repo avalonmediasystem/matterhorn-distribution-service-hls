@@ -30,6 +30,7 @@ import org.opencastproject.mediapackage.MediaPackageElement;
 import org.opencastproject.mediapackage.MediaPackageElementParser;
 import org.opencastproject.mediapackage.MediaPackageException;
 import org.opencastproject.mediapackage.MediaPackageParser;
+import org.opencastproject.mediapackage.track.TrackImpl;
 import org.opencastproject.security.api.OrganizationDirectoryService;
 import org.opencastproject.security.api.SecurityService;
 import org.opencastproject.security.api.TrustedHttpClient;
@@ -191,8 +192,15 @@ public class HLSDistributionServiceImpl extends AbstractJobProducer implements D
     // Make sure the element exists
     if (mediapackage.getElementById(elementId) == null)
       throw new IllegalStateException("No element " + elementId + " found in mediapackage");
-    // Streaming servers only deal with tracks
+    // HLS streaming servers only deal with tracks
     if (!MediaPackageElement.Type.Track.equals(element.getElementType())) {
+      logger.debug("Skipping {} {} for distribution to the streaming server", element.getElementType().toString()
+        .toLowerCase(), element.getIdentifier());
+      return null;
+    }
+    // The HLS ffmpeg profile only copies content so the input track must be h.264
+    TrackImpl track = (TrackImpl )element;
+    if (track.getVideo().isEmpty() || !track.getVideo().get(0).getFormat().equals("H.264")){
       logger.debug("Skipping {} {} for distribution to the streaming server", element.getElementType().toString()
         .toLowerCase(), element.getIdentifier());
       return null;

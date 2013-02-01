@@ -14,6 +14,19 @@
         <frameRate>2</frameRate>
       </video>
     </track>
+    <track id="track-2" type="presentation/source">
+      <mimetype>video/x-flv</mimetype>
+      <url>media.flv</url>
+      <checksum type="md5">43b7d843b02c4a429b2f547a4f230d31</checksum>
+      <duration>1004400000</duration>
+      <video>
+        <encoder type="H.263"/>
+        <resolution>640x480</resolution>
+        <scanType type="progressive" />
+        <bitrate>200000</bitrate>
+        <frameRate>2</frameRate>
+      </video>
+    </track>
   </media>
   <metadata>
     <catalog id="catalog-1" type="dublincore/episode">
