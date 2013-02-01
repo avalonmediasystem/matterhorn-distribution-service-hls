@@ -29,6 +29,7 @@ import org.opencastproject.job.api.Job;
 import org.opencastproject.job.api.JobBarrier;
 import org.opencastproject.mediapackage.DefaultMediaPackageSerializerImpl;
 import org.opencastproject.mediapackage.MediaPackage;
+import org.opencastproject.mediapackage.MediaPackageElement;
 import org.opencastproject.mediapackage.MediaPackageBuilder;
 import org.opencastproject.mediapackage.MediaPackageBuilderFactory;
 import org.opencastproject.mediapackage.MediaPackageElementParser;
@@ -139,6 +140,12 @@ public class HLSDistributionServiceImplTest {
     Assert.assertTrue(mediaDir.exists());
     Assert.assertTrue(new File(mediaDir, "media.m3u8").exists()); // HLS playlist should have been created
     Assert.assertTrue(new File(mediaDir, "media-000.ts").exists()); // HLS segment files should have been created
+
+    //Test that the HLS playlist was added as a delivery track
+    MediaPackageElement mpe = MediaPackageElementParser.getFromXml(job1.getPayload());
+    Assert.assertEquals(mpe.getMimeType(), "application/x-mpegURL");    
+    Assert.assertEquals(mpe.getElementType(), MediaPackageElement.Type.Track);
+    Assert.assertEquals(mpe.getURI(), UrlSupport.concat(service.serviceUrl, mp.getIdentifier().compact(), mpe.getIdentifier(), "media.m3u8"));
   }
 
   @Test
@@ -160,12 +167,12 @@ public class HLSDistributionServiceImplTest {
     Assert.assertTrue(new File(mediaDir, "media-000.ts").exists()); // HLS segment files should have been created
 
     // Now retract the mediapackage and ensure that the distributed files have been removed
-    Job job5 = service.retract(mp, "track-1");
-    jobBarrier = new JobBarrier(serviceRegistry, 500, job5);
+    Job job2 = service.retract(mp, "track-1");
+    jobBarrier = new JobBarrier(serviceRegistry, 500, job2);
     jobBarrier.waitForJobs();
 
     // Remove the distributed elements from the mediapackage
-    mp.remove(MediaPackageElementParser.getFromXml(job5.getPayload()));
+    mp.remove(MediaPackageElementParser.getFromXml(job2.getPayload()));
 
     Assert.assertEquals(elementCount, mp.getElements().length);
     Assert.assertNotNull(mp.getElementById("track-1"));
