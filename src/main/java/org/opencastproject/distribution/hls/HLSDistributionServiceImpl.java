@@ -237,23 +237,26 @@ public class HLSDistributionServiceImpl extends AbstractJobProducer implements D
       properties.put("profile.hls.http.name", "hls");
       properties.put("profile.hls.http.input", "visual");
       properties.put("profile.hls.http.output", "visual");
-      properties.put("profile.hls.http.suffix", "-hls.m3u8");
+      properties.put("profile.hls.http.suffix", ".m3u8");
       properties.put("profile.hls.http.mimetype", "application/x-mpegURL");
-      properties.put("profile.hls.http.ffmpeg.command", "-i #{in.video.path} -codec copy -map 0 -bsf h264_mp4toannexb -f segment -segment_list #{out.dir}/#{out.name}#{out.suffix} -segment_time 10 #{out.dir}/#{out.name}-%03d.ts");
+      properties.put("profile.hls.http.outputdir", destination.getAbsoluteFile().getParent());
+      properties.put("profile.hls.http.ffmpeg.command", "-i #{in.video.path} -codec copy -map 0 -bsf h264_mp4toannexb -f segment -segment_list #{outputdir}/#{out.name}#{out.suffix} -segment_time 10 #{outputdir}/#{out.name}-%03d.ts");
       EncodingProfile profile = createEncodingProfile("profile.hls.http", ".m3u8", properties);
       System.out.println("Suffix: " + profile.getIdentifier());
- 
-//      URL sourceUrl = getClass().getResource("/media.mov");
-//      File sourceFile = new File(sourceUrl.toURI());
-
+      System.out.println("Outputdir: " + profile.getExtension("outputdir"));
 
       try {
-        FileSupport.link(source, destination, true);
+        System.out.println("Trying to encode: linking " + source + " to " + destination);
+//        FileSupport.link(source, destination, true);
+        System.out.println("Trying to encode: creating engine");
         engine = new FFmpegHLSEncoderEngine();
-        File playlistFile = engine.encode(destination, profile, null);
+//        System.out.println("commandline: " + engine.buildArgumentList(profile)); 
+        System.out.println("Trying to encode: Encoding");
+        File playlistFile = engine.encode(source, profile, null).getOrElseNull();
         System.out.println("Encoder output: " + playlistFile.getName());
-      } catch (IOException e) {
-        throw new DistributionException("Unable to copy " + source + " to " + destination, e);
+      } catch (Exception e) {
+        System.out.println("Caught exception: " + e.getMessage());
+        throw new DistributionException("Unable to generare HLS segments and playlists for " + source + " in " + destination, e);
       }
 
       // Create a representation of the distributed file in the mediapackage

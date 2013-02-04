@@ -15,9 +15,6 @@
  */
 package org.opencastproject.distribution.hls;
 
-import static org.opencastproject.security.api.SecurityConstants.DEFAULT_ORGANIZATION_ANONYMOUS;
-import static org.opencastproject.security.api.SecurityConstants.DEFAULT_ORGANIZATION_ID;
-
 import junit.framework.Assert;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
@@ -65,18 +62,6 @@ public class HLSDistributionServiceImplTest {
   private File distributionRoot = null;
   private ServiceRegistry serviceRegistry = null;
 
-  /** The default organization identifier */
-  String DEFAULT_ORGANIZATION_ID = "mh_default_org";
-
-  /** The default organization name */
-  String DEFAULT_ORGANIZATION_NAME = "Opencast Project";
-
-  /** Name of the default organization's local admin role */
-  String DEFAULT_ORGANIZATION_ADMIN = "ROLE_ADMIN";
-
-  /** Name of the default organization's local anonymous role */
-  String DEFAULT_ORGANIZATION_ANONYMOUS = "ANONYMOUS";
-
   @Before
   public void setUp() throws Exception {
     File mediaPackageRoot = new File(getClass().getResource("/mediapackage.xml").toURI()).getParentFile();
@@ -105,8 +90,8 @@ public class HLSDistributionServiceImplTest {
     EasyMock.expect(httpClient.execute((HttpUriRequest) EasyMock.anyObject())).andReturn(response).anyTimes();
     EasyMock.replay(httpClient);
 
-    User anonymous = new User("anonymous", DEFAULT_ORGANIZATION_ID,
-            new String[] { DEFAULT_ORGANIZATION_ANONYMOUS });
+    User anonymous = new User("anonymous", DefaultOrganization.DEFAULT_ORGANIZATION_ID,
+            new String[] { DefaultOrganization.DEFAULT_ORGANIZATION_ANONYMOUS });
     UserDirectoryService userDirectoryService = EasyMock.createMock(UserDirectoryService.class);
     EasyMock.expect(userDirectoryService.loadUser((String) EasyMock.anyObject())).andReturn(anonymous).anyTimes();
     EasyMock.replay(userDirectoryService);
@@ -147,6 +132,7 @@ public class HLSDistributionServiceImplTest {
     ((ServiceRegistryInMemoryImpl) serviceRegistry).dispose();
   }
 
+  @Test
   public void testGetDistributionFile() throws Exception {
     File destFile = service.getDistributionFile(mp, mp.getElementById("track-1"));
     String expectedPath = PathSupport.concat(new String[] { distributionRoot.getAbsolutePath(),
@@ -155,6 +141,7 @@ public class HLSDistributionServiceImplTest {
     Assert.assertEquals(new File(expectedPath), destFile);
   }
 
+  @Test
   public void testGetDistributionUri() throws Exception {
     URI distUri = service.getDistributionUri(mp.getIdentifier().compact(), mp.getElementById("track-1"));
     String expectedUri = UrlSupport.concat(service.serviceUrl, mp.getIdentifier().compact(), "track-1", "media.m3u8");
@@ -162,6 +149,7 @@ public class HLSDistributionServiceImplTest {
     Assert.assertEquals(new URI(expectedUri), distUri);
   }
 
+  @Test
   public void testNonH264TrackDistribution() throws Exception {
     Job job1 = service.distribute(mp, "track-2"); // "track-2" should NOT be distributed
     JobBarrier jobBarrier = new JobBarrier(serviceRegistry, 500, job1);
@@ -197,6 +185,7 @@ public class HLSDistributionServiceImplTest {
     Assert.assertEquals(UrlSupport.concat(service.serviceUrl, mp.getIdentifier().compact(), mpe.getIdentifier(), "media.m3u8"), mpe.getURI());
   }
 
+  @Test
   public void testTrackRetract() throws Exception {
     int elementCount = mp.getElements().length;
 
@@ -230,6 +219,7 @@ public class HLSDistributionServiceImplTest {
     Assert.assertFalse(new File(mediaDir, "media-000.ts").exists()); // HLS segment files should have been created
   }
 
+  @Test
   public void testOnlyTrackDistribution() throws Exception {
     // Distribute only track elements in the mediapackage
     Job job = service.distribute(mp, "catalog-1"); // "catalog-1" should NOT be distributed
