@@ -24,6 +24,7 @@ import org.opencastproject.distribution.api.DistributionException;
 import org.opencastproject.distribution.api.DistributionService;
 //import org.opencastproject.distribution.api.DownloadDistributionService;
 import org.opencastproject.job.api.AbstractJobProducer;
+import org.opencastproject.composer.api.EncodingProfile;
 import org.opencastproject.job.api.Job;
 import org.opencastproject.mediapackage.MediaPackage;
 import org.opencastproject.mediapackage.MediaPackageElement;
@@ -51,9 +52,12 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;;
 
 /**
  * Distributes media to the local media delivery directory.
@@ -103,6 +107,9 @@ public class HLSDistributionServiceImpl extends AbstractJobProducer implements D
 
   /** The trusted HTTP client */
   private TrustedHttpClient trustedHttpClient;
+
+  /** the encoding engine */
+  private FFmpegHLSEncoderEngine engine;
 
   /**
    * Creates a new instance of the hls distribution service.
@@ -226,11 +233,28 @@ public class HLSDistributionServiceImpl extends AbstractJobProducer implements D
       logger.info("Distributing {} to {}", elementId, destination);
 
       // Do the HLS segmentation and m3u8 playlist generation
-//      try {
-//        FileSupport.link(source, destination, true);
-//      } catch (IOException e) {
-//        throw new DistributionException("Unable to copy " + source + " to " + destination, e);
-//      }
+      final Map<String, String> properties = new HashMap<String, String>();
+      properties.put("profile.hls.http.name", "hls");
+      properties.put("profile.hls.http.input", "visual");
+      properties.put("profile.hls.http.output", "visual");
+      properties.put("profile.hls.http.suffix", "-hls.m3u8");
+      properties.put("profile.hls.http.mimetype", "application/x-mpegURL");
+      properties.put("profile.hls.http.ffmpeg.command", "-i #{in.video.path} -codec copy -map 0 -bsf h264_mp4toannexb -f segment -segment_list #{out.dir}/#{out.name}#{out.suffix} -segment_time 10 #{out.dir}/#{out.name}-%03d.ts");
+      EncodingProfile profile = createEncodingProfile("profile.hls.http", ".m3u8", properties);
+      System.out.println("Suffix: " + profile.getIdentifier());
+ 
+//      URL sourceUrl = getClass().getResource("/media.mov");
+//      File sourceFile = new File(sourceUrl.toURI());
+
+
+      try {
+        FileSupport.link(source, destination, true);
+        engine = new FFmpegHLSEncoderEngine();
+        File playlistFile = engine.encode(destination, profile, null);
+        System.out.println("Encoder output: " + playlistFile.getName());
+      } catch (IOException e) {
+        throw new DistributionException("Unable to copy " + source + " to " + destination, e);
+      }
 
       // Create a representation of the distributed file in the mediapackage
       MediaPackageElement distributedElement = (MediaPackageElement) element.clone();
@@ -270,6 +294,75 @@ public class HLSDistributionServiceImpl extends AbstractJobProducer implements D
         throw new DistributionException(e);
       }
     }
+  }
+
+  /**
+   * Creates EncodingProfile.
+   * 
+   * @param name
+   * @param suffix
+   * @param properties
+   * @return
+   */
+  private EncodingProfile createEncodingProfile(final String name, final String suffix,
+          final Map<String, String> properties) {
+    EncodingProfile profile = new EncodingProfile() {
+      @Override
+      public boolean isApplicableTo(MediaType type) {
+        return false;
+      }
+
+      @Override
+      public boolean hasExtensions() {
+        return false;
+      }
+
+      @Override
+      public String getSuffix() {
+        return suffix;
+      }
+
+      @Override
+      public Object getSource() {
+        return null;
+      }
+
+      @Override
+      public MediaType getOutputType() {
+        return null;
+      }
+
+      @Override
+      public String getName() {
+        return name;
+      }
+
+      @Override
+      public String getMimeType() {
+        return null;
+      }
+
+      @Override
+      public String getIdentifier() {
+        return name;
+      }
+
+      @Override
+      public Map<String, String> getExtensions() {
+        return properties;
+      }
+
+      @Override
+      public String getExtension(String key) {
+        return properties.get(getIdentifier() + "." + key);
+      }
+
+      @Override
+      public MediaType getApplicableMediaType() {
+        return null;
+      }
+    };
+    return profile;
   }
 
   @Override

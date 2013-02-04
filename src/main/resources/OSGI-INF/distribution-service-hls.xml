@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <scr:components xmlns:scr="http://www.osgi.org/xmlns/scr/v1.1.0">
-  <scr:component name="org.opencastproject.distribution.download.DownloadDistributionServiceImpl" immediate="true"
+  <scr:component name="org.opencastproject.distribution.hls.HLSDistributionServiceImpl" immediate="true"
     activate="activate">
-    <implementation class="org.opencastproject.distribution.download.DownloadDistributionServiceImpl" />
+    <implementation class="org.opencastproject.distribution.hls.HLSDistributionServiceImpl" />
     <property name="service.description" value="Distribution Service (Local)" />
-    <property name="distribution.channel" value="download" />
+    <property name="distribution.channel" value="hls" />
     <service>
       <provide interface="org.opencastproject.distribution.api.DistributionService" />
-      <provide interface="org.opencastproject.distribution.api.DownloadDistributionService" />
+      <provide interface="org.opencastproject.distribution.api.HLSDistributionService" />
     </service>
     <reference name="WORKSPACE" interface="org.opencastproject.workspace.api.Workspace" cardinality="1..1"
       policy="static" bind="setWorkspace" />
@@ -23,20 +23,20 @@
       cardinality="1..1" policy="static" bind="setTrustedHttpClient" />
   </scr:component>
 
-  <scr:component name="org.opencastproject.distribution.download.endpoint.DownloadDistributionRestService"
+  <scr:component name="org.opencastproject.distribution.hls.endpoint.HLSDistributionRestService"
     immediate="true" activate="activate">
-    <implementation class="org.opencastproject.distribution.download.endpoint.DownloadDistributionRestService" />
-    <property name="service.description" value="Download Distribution REST Endpoint" />
+    <implementation class="org.opencastproject.distribution.hls.endpoint.HLSDistributionRestService" />
+    <property name="service.description" value="HLS Distribution REST Endpoint" />
 
-    <property name="opencast.service.type" value="org.opencastproject.distribution.download" />
-    <property name="opencast.service.path" value="/distribution/download" />
+    <property name="opencast.service.type" value="org.opencastproject.distribution.hls" />
+    <property name="opencast.service.path" value="/distribution/hls" />
     <property name="opencast.service.jobproducer" value="true" />
 
     <service>
-      <provide interface="org.opencastproject.distribution.download.endpoint.DownloadDistributionRestService" />
+      <provide interface="org.opencastproject.distribution.hls.endpoint.HLSDistributionRestService" />
     </service>
 
-    <reference name="distributionService" interface="org.opencastproject.distribution.api.DownloadDistributionService"
+    <reference name="distributionService" interface="org.opencastproject.distribution.api.HLSDistributionService"
       cardinality="1..1" policy="static" bind="setService" />
     <reference name="serviceRegistry" interface="org.opencastproject.serviceregistry.api.ServiceRegistry"
       cardinality="1..1" policy="static" bind="setServiceRegistry" />
