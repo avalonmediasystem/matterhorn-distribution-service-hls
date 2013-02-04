@@ -39,6 +39,7 @@ import org.opencastproject.security.api.UserDirectoryService;
 import org.opencastproject.serviceregistry.api.ServiceRegistry;
 import org.opencastproject.serviceregistry.api.ServiceRegistryException;
 import org.opencastproject.util.FileSupport;
+import org.opencastproject.util.MimeType;
 import org.opencastproject.util.NotFoundException;
 import org.opencastproject.util.PathSupport;
 import org.opencastproject.util.UrlSupport;
@@ -239,24 +240,18 @@ public class HLSDistributionServiceImpl extends AbstractJobProducer implements D
       properties.put("profile.hls.http.output", "visual");
       properties.put("profile.hls.http.suffix", ".m3u8");
       properties.put("profile.hls.http.mimetype", "application/x-mpegURL");
-      properties.put("profile.hls.http.outputdir", destination.getAbsoluteFile().getParent());
-      properties.put("profile.hls.http.ffmpeg.command", "-i #{in.video.path} -codec copy -map 0 -bsf h264_mp4toannexb -f segment -segment_list #{outputdir}/#{out.name}#{out.suffix} -segment_time 10 #{outputdir}/#{out.name}-%03d.ts");
+      properties.put("profile.hls.http.ffmpeg.command", "-i #{in.video.path} -codec copy -map 0 -bsf h264_mp4toannexb -f segment -segment_list #{outputdir}/#{outputname}#{out.suffix} -segment_time 10 #{outputdir}/#{outputname}-%03d.ts");
       EncodingProfile profile = createEncodingProfile("profile.hls.http", ".m3u8", properties);
-      System.out.println("Suffix: " + profile.getIdentifier());
-      System.out.println("Outputdir: " + profile.getExtension("outputdir"));
+      
+      final Map<String, String> commandLineOpts = new HashMap<String, String>();
+      commandLineOpts.put("outputdir", destination.getAbsoluteFile().getParent());
+      commandLineOpts.put("outputname", FilenameUtils.getBaseName(destination.getName()));
 
       try {
-        System.out.println("Trying to encode: linking " + source + " to " + destination);
-//        FileSupport.link(source, destination, true);
-        System.out.println("Trying to encode: creating engine");
         engine = new FFmpegHLSEncoderEngine();
-//        System.out.println("commandline: " + engine.buildArgumentList(profile)); 
-        System.out.println("Trying to encode: Encoding");
-        File playlistFile = engine.encode(source, profile, null).getOrElseNull();
-        System.out.println("Encoder output: " + playlistFile.getName());
+        File playlistFile = engine.encode(source, profile, commandLineOpts).getOrElseNull();
       } catch (Exception e) {
-        System.out.println("Caught exception: " + e.getMessage());
-        throw new DistributionException("Unable to generare HLS segments and playlists for " + source + " in " + destination, e);
+        throw new DistributionException("Unable to generare HLS segments and playlists for " + source + " in " + destination.getAbsoluteFile().getParent(), e);
       }
 
       // Create a representation of the distributed file in the mediapackage
@@ -266,6 +261,7 @@ public class HLSDistributionServiceImpl extends AbstractJobProducer implements D
       } catch (URISyntaxException e) {
         throw new DistributionException("Distributed element produces an invalid URI", e);
       }
+      distributedElement.setMimeType(MimeType.mimeType("application", "x-mpegURL"));
       distributedElement.setIdentifier(null);
 
       logger.info("Finished distribution of {}", element);

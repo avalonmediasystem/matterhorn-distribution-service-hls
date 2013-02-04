@@ -43,6 +43,7 @@ import org.opencastproject.security.api.User;
 import org.opencastproject.security.api.UserDirectoryService;
 import org.opencastproject.serviceregistry.api.ServiceRegistry;
 import org.opencastproject.serviceregistry.api.ServiceRegistryInMemoryImpl;
+import org.opencastproject.util.MimeType;
 import org.opencastproject.util.PathSupport;
 import org.opencastproject.util.UrlSupport;
 import org.opencastproject.workspace.api.Workspace;
@@ -180,9 +181,9 @@ public class HLSDistributionServiceImplTest {
 
     //Test that the HLS playlist was added as a delivery track
     MediaPackageElement mpe = MediaPackageElementParser.getFromXml(job1.getPayload());
-    Assert.assertEquals("application/x-mpegURL", mpe.getMimeType());
+    Assert.assertEquals(MimeType.mimeType("application","x-mpegURL"), mpe.getMimeType());
     Assert.assertEquals(MediaPackageElement.Type.Track, mpe.getElementType());
-    Assert.assertEquals(UrlSupport.concat(service.serviceUrl, mp.getIdentifier().compact(), mpe.getIdentifier(), "media.m3u8"), mpe.getURI());
+    Assert.assertEquals(new URI(UrlSupport.concat(service.serviceUrl, mp.getIdentifier().compact(), "track-1", "media.m3u8")), mpe.getURI());
   }
 
   @Test
