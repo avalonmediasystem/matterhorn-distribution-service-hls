@@ -160,12 +160,48 @@ public class HLSDistributionServiceImplTest {
     Assert.assertFalse(mpDir.exists());
     File mediaDir = new File(mpDir, "track-2");
     Assert.assertFalse(mediaDir.exists());
-    Assert.assertFalse(new File(mediaDir, "media.m3u8").exists()); // HLS playlist should have been created
-    Assert.assertFalse(new File(mediaDir, "media-000.ts").exists()); // HLS segment files should have been created
+    Assert.assertFalse(new File(mediaDir, "media.m3u8").exists()); // HLS playlist should NOT have been created
+    Assert.assertFalse(new File(mediaDir, "media-000.ts").exists()); // HLS segment files should NOT have been created
   }
 
   @Test
-  public void testTrackDistribution() throws Exception {
+  public void testNonAACTrackDistribution() throws Exception {
+    Job job1 = service.distribute(mp, "track-4"); // "track-4" should NOT be distributed
+    JobBarrier jobBarrier = new JobBarrier(serviceRegistry, 500, job1);
+    jobBarrier.waitForJobs();
+
+    File mpDir = new File(distributionRoot, mp.getIdentifier().compact());
+    Assert.assertFalse(mpDir.exists());
+    File mediaDir = new File(mpDir, "track-4");
+    Assert.assertFalse(mediaDir.exists());
+    Assert.assertFalse(new File(mediaDir, "media.m3u8").exists()); // HLS playlist should NOT have been created
+    Assert.assertFalse(new File(mediaDir, "media-000.ts").exists()); // HLS segment files should NOT have been created
+  }
+
+  @Test
+  public void testAudioDistribution() throws Exception {
+    
+    // Distribute only some of the elements in the mediapackage
+    Job job1 = service.distribute(mp, "track-3"); // "track-3" should be distributed
+    JobBarrier jobBarrier = new JobBarrier(serviceRegistry, 500, job1);
+    jobBarrier.waitForJobs();
+
+    File mpDir = new File(distributionRoot, mp.getIdentifier().compact());
+    Assert.assertTrue(mpDir.exists());
+    File mediaDir = new File(mpDir, "track-3");
+    Assert.assertTrue(mediaDir.exists());
+    Assert.assertTrue(new File(mediaDir, "media.m3u8").exists()); // HLS playlist should have been created
+    Assert.assertTrue(new File(mediaDir, "media-000.ts").exists()); // HLS segment files should have been created
+
+    //Test that the HLS playlist was added as a delivery track
+    MediaPackageElement mpe = MediaPackageElementParser.getFromXml(job1.getPayload());
+    Assert.assertEquals(MimeType.mimeType("application","x-mpegURL"), mpe.getMimeType());
+    Assert.assertEquals(MediaPackageElement.Type.Track, mpe.getElementType());
+    Assert.assertEquals(new URI(UrlSupport.concat(service.serviceUrl, mp.getIdentifier().compact(), "track-3", "media.m3u8")), mpe.getURI());
+  }
+
+  @Test
+  public void testVideoTrackDistribution() throws Exception {
 
     // Distribute only some of the elements in the mediapackage
     Job job1 = service.distribute(mp, "track-1"); // "track-1" should be distributed

@@ -27,6 +27,29 @@
         <frameRate>2</frameRate>
       </video>
     </track>
+    <track id="track-3" type="presentation/source">
+      <mimetype>audio/mp4</mimetype>
+      <url>media.aac</url>
+      <checksum type="md5">43b7d843b02c4a429b2f547a4f230d31</checksum>
+      <duration>1004400000</duration>
+      <audio>
+        <encoder type="AAC"/>
+        <channels>2</channels>
+        <bitrate>128000</bitrate>
+      </audio>
+    </track>
+    <track id="track-4" type="presentation/source">
+      <mimetype>audio/x-wav</mimetype>
+      <url>media.wav</url>
+      <checksum type="md5">43b7d843b02c4a429b2f547a4f230d31</checksum>
+      <duration>1004400000</duration>
+      <audio>
+        <encoder type="PCM"/>
+        <channels>2</channels>
+        <bitdepth>16</bitdepth>
+        <bitrate>1411200.0</bitrate>
+      </audio>
+    </track>
   </media>
   <metadata>
     <catalog id="catalog-1" type="dublincore/episode">

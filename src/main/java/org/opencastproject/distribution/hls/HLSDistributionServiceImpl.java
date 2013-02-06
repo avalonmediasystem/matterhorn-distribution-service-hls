@@ -208,11 +208,19 @@ public class HLSDistributionServiceImpl extends AbstractJobProducer implements D
     }
     // The HLS ffmpeg profile only copies content so the input track must be h.264
     TrackImpl track = (TrackImpl )element;
-    if (track.getVideo().isEmpty() || !track.getVideo().get(0).getFormat().equals("H.264")){
+    if (track.getVideo().isEmpty() && track.getAudio().isEmpty()) {
       logger.debug("Skipping {} {} for distribution to the streaming server", element.getElementType().toString()
         .toLowerCase(), element.getIdentifier());
-      return null;
-    }
+       return null;
+    } else if (!track.getVideo().isEmpty() && !track.getVideo().get(0).getFormat().equals("H.264")) {
+      logger.debug("Skipping {} {} for distribution to the streaming server", element.getElementType().toString()
+        .toLowerCase(), element.getIdentifier());
+       return null;
+    } else if (!track.getAudio().isEmpty() && !track.getAudio().get(0).getFormat().equals("AAC")) {
+      logger.debug("Skipping {} {} for distribution to the streaming server", element.getElementType().toString()
+        .toLowerCase(), element.getIdentifier());
+       return null;
+    } 
 
     try {
       File source;
