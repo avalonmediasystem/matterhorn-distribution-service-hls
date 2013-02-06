@@ -3,7 +3,7 @@
   <scr:component name="org.opencastproject.distribution.hls.HLSDistributionServiceImpl" immediate="true"
     activate="activate">
     <implementation class="org.opencastproject.distribution.hls.HLSDistributionServiceImpl" />
-    <property name="service.description" value="Distribution Service (Local)" />
+    <property name="service.description" value="Distribution Service (HLS)" />
     <property name="distribution.channel" value="hls" />
     <service>
       <provide interface="org.opencastproject.distribution.api.DistributionService" />
@@ -35,6 +35,8 @@
       <provide interface="org.opencastproject.distribution.hls.endpoint.HLSDistributionRestService" />
     </service>
 
+    <reference name="distributionService" interface="org.opencastproject.distribution.api.DistributionService"
+      cardinality="1..1" policy="static" bind="setService" target="(distribution.channel=hls)" />
     <reference name="serviceRegistry" interface="org.opencastproject.serviceregistry.api.ServiceRegistry"
       cardinality="1..1" policy="static" bind="setServiceRegistry" />
   </scr:component>

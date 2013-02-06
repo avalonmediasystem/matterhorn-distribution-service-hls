@@ -17,8 +17,7 @@ package org.opencastproject.distribution.hls.endpoint;
 
 import static javax.servlet.http.HttpServletResponse.SC_OK;
 
-import org.opencastproject.distribution.hls.HLSDistributionServiceImpl;
-//import org.opencastproject.distribution.api.DownloadDistributionService;
+import org.opencastproject.distribution.api.DistributionService;
 import org.opencastproject.job.api.JaxbJob;
 import org.opencastproject.job.api.Job;
 import org.opencastproject.job.api.JobProducer;
@@ -49,8 +48,8 @@ import javax.ws.rs.core.Response.Status;
  * Rest endpoint for distributing media to the local distribution channel.
  */
 @Path("")
-@RestService(name = "localdistributionservice", title = "Local Distribution Service",
-  abstractText = "This service distributes media packages to the Matterhorn feed and engage services.",
+@RestService(name = "hlsdistributionservice", title = "HLS Distribution Service",
+  abstractText = "This service distributes HLS segments and m3u8 playlist to a directory.",
   notes = {
         "All paths above are relative to the REST endpoint base (something like http://your.server/files)",
         "If the service is down or not working it will return a status 503, this means the the underlying service is "
@@ -64,7 +63,7 @@ public class HLSDistributionRestService extends AbstractJobProducerEndpoint {
   private static final Logger logger = LoggerFactory.getLogger(HLSDistributionRestService.class);
 
   /** The hls distribution service */
-  protected HLSDistributionServiceImpl service;
+  protected DistributionService service;
 
   /** The service registry */
   protected ServiceRegistry serviceRegistry = null;
@@ -83,7 +82,7 @@ public class HLSDistributionRestService extends AbstractJobProducerEndpoint {
    * @param service
    *          the service to set
    */
-  public void setService(HLSDistributionServiceImpl service) {
+  public void setService(DistributionService service) {
     this.service = service;
   }
 
@@ -109,7 +108,7 @@ public class HLSDistributionRestService extends AbstractJobProducerEndpoint {
     Job job = null;
     try {
       MediaPackage mediapackage = MediaPackageParser.getFromXml(mediaPackageXml);
-      job = service.distribute(mediapackage, elementId, checkAvailability);
+      job = service.distribute(mediapackage, elementId);
     } catch (Exception e) {
       logger.warn("Error distributing element", e);
       return Response.serverError().status(Status.INTERNAL_SERVER_ERROR).build();
