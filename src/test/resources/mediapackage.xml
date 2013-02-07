@@ -1,6 +1,6 @@
 <mediapackage xmlns="http://mediapackage.opencastproject.org" id="10.0000/1" start="2007-12-05T13:40:00" duration="1004400000">
   <media>
-    <track id="track-1" type="presentation/source">
+    <track id="track-h264" type="presentation/source">
       <mimetype>video/quicktime</mimetype>
       <url>media.mov</url>
       <checksum type="md5">43b7d843b02c4a429b2f547a4f230d31</checksum>
@@ -14,7 +14,7 @@
         <frameRate>2</frameRate>
       </video>
     </track>
-    <track id="track-2" type="presentation/source">
+    <track id="track-h263" type="presentation/source">
       <mimetype>video/x-flv</mimetype>
       <url>media.flv</url>
       <checksum type="md5">43b7d843b02c4a429b2f547a4f230d31</checksum>
@@ -27,7 +27,7 @@
         <frameRate>2</frameRate>
       </video>
     </track>
-    <track id="track-3" type="presentation/source">
+    <track id="track-aac" type="presentation/source">
       <mimetype>audio/mp4</mimetype>
       <url>media.aac</url>
       <checksum type="md5">43b7d843b02c4a429b2f547a4f230d31</checksum>
@@ -38,7 +38,7 @@
         <bitrate>128000</bitrate>
       </audio>
     </track>
-    <track id="track-4" type="presentation/source">
+    <track id="track-pcm" type="presentation/source">
       <mimetype>audio/x-wav</mimetype>
       <url>media.wav</url>
       <checksum type="md5">43b7d843b02c4a429b2f547a4f230d31</checksum>
@@ -49,6 +49,20 @@
         <bitdepth>16</bitdepth>
         <bitrate>1411200.0</bitrate>
       </audio>
+    </track>
+    <track id="track-avc" type="presentation/source">
+      <mimetype>video/quicktime</mimetype>
+      <url>media.mov</url>
+      <checksum type="md5">43b7d843b02c4a429b2f547a4f230d31</checksum>
+      <duration>1004400000</duration>
+      <video>
+        <device type="UFG03" version="30112007" vendor="Unigraf" />
+        <encoder type="AVC"/>
+        <resolution>640x480</resolution>
+        <scanType type="progressive" />
+        <bitrate>540520</bitrate>
+        <frameRate>2</frameRate>
+      </video>
     </track>
   </media>
   <metadata>
