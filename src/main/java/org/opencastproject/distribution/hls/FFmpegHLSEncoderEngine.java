@@ -41,6 +41,10 @@ public class FFmpegHLSEncoderEngine extends FFmpegEncoderEngine {
   public FFmpegHLSEncoderEngine() {
     super();
   }
+ 
+  public void activate(ComponentContext cc) {
+    super.activate(cc);
+  }
 
   /**
    * {@inheritDoc}

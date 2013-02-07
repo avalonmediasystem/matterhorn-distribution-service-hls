@@ -126,6 +126,9 @@ public class HLSDistributionServiceImpl extends AbstractJobProducer implements D
    *          the OSGi component context
    */
   protected void activate(ComponentContext cc) {
+    engine = new FFmpegHLSEncoderEngine();
+    engine.activate(cc);
+
     serviceUrl = cc.getBundleContext().getProperty("org.opencastproject.hls.url");
     if (serviceUrl == null)
       throw new IllegalStateException("HLS url must be set (org.opencastproject.hls.url)");
@@ -223,7 +226,7 @@ public class HLSDistributionServiceImpl extends AbstractJobProducer implements D
       } catch (IOException e) {
         throw new DistributionException("Unable to create " + destination.getParentFile(), e);
       }
-      logger.info("Distributing {} to {}", elementId, destination);
+      logger.debug("Distributing {} to {}", elementId, destination);
 
       // Do the HLS segmentation and m3u8 playlist generation
       final Map<String, String> properties = new HashMap<String, String>();
@@ -240,7 +243,7 @@ public class HLSDistributionServiceImpl extends AbstractJobProducer implements D
       commandLineOpts.put("outputname", FilenameUtils.getBaseName(destination.getName()));
 
       try {
-        engine = new FFmpegHLSEncoderEngine();
+        engine = engine == null ? new FFmpegHLSEncoderEngine() : engine;
         File playlistFile = engine.encode(source, profile, commandLineOpts).getOrElseNull();
       } catch (Exception e) {
         throw new DistributionException("Unable to generare HLS segments and playlists for " + source + " in " + destination.getAbsoluteFile().getParent(), e);
