@@ -486,7 +486,7 @@ public class HLSDistributionServiceImpl extends AbstractJobProducer implements D
    */
   protected File getDistributionFile(MediaPackage mediaPackage, MediaPackageElement element) {
     String elementId = element.getIdentifier();
-    String fileName = FilenameUtils.getBaseName(element.getURI().toString()) + ".m3u8";
+    String fileName = FilenameUtils.getName(element.getURI().toString()) + ".m3u8";
     String directoryName = distributionDirectory.getAbsolutePath();
     String destinationFileName = PathSupport.concat(new String[] { directoryName,
             mediaPackage.getIdentifier().compact(), elementId, fileName });
@@ -524,7 +524,7 @@ public class HLSDistributionServiceImpl extends AbstractJobProducer implements D
    */
   protected URI getDistributionUri(String mediaPackageId, MediaPackageElement element) throws URISyntaxException {
     String elementId = element.getIdentifier();
-    String fileName = FilenameUtils.getBaseName(element.getURI().toString()) + ".m3u8";
+    String fileName = FilenameUtils.getName(element.getURI().toString()) + ".m3u8";
     String destinationURI = UrlSupport.concat(serviceUrl, mediaPackageId, elementId, fileName);
     return new URI(destinationURI);
   }

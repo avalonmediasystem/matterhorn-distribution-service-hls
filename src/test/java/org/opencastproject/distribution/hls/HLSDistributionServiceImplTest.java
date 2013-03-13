@@ -138,7 +138,7 @@ public class HLSDistributionServiceImplTest {
   public void testGetDistributionFile() throws Exception {
     File destFile = service.getDistributionFile(mp, mp.getElementById("track-h264"));
     String expectedPath = PathSupport.concat(new String[] { distributionRoot.getAbsolutePath(),
-            mp.getIdentifier().compact(), "track-h264", "media.m3u8" });
+            mp.getIdentifier().compact(), "track-h264", "media.mov.m3u8" });
 
     Assert.assertEquals(new File(expectedPath), destFile);
   }
@@ -146,7 +146,7 @@ public class HLSDistributionServiceImplTest {
   @Test
   public void testGetDistributionUri() throws Exception {
     URI distUri = service.getDistributionUri(mp.getIdentifier().compact(), mp.getElementById("track-h264"));
-    String expectedUri = UrlSupport.concat(service.serviceUrl, mp.getIdentifier().compact(), "track-h264", "media.m3u8");
+    String expectedUri = UrlSupport.concat(service.serviceUrl, mp.getIdentifier().compact(), "track-h264", "media.mov.m3u8");
 
     Assert.assertEquals(new URI(expectedUri), distUri);
   }
@@ -189,14 +189,14 @@ public class HLSDistributionServiceImplTest {
     Assert.assertTrue(mpDir.exists());
     File mediaDir = new File(mpDir, "track-aac");
     Assert.assertTrue(mediaDir.exists());
-    Assert.assertTrue(new File(mediaDir, "media.m3u8").exists()); // HLS playlist should have been created
-    Assert.assertTrue(new File(mediaDir, "media-000.ts").exists()); // HLS segment files should have been created
+    Assert.assertTrue(new File(mediaDir, "media.aac.m3u8").exists()); // HLS playlist should have been created
+    Assert.assertTrue(new File(mediaDir, "media.aac-000.ts").exists()); // HLS segment files should have been created
 
     //Test that the HLS playlist was added as a delivery track
     MediaPackageElement mpe = MediaPackageElementParser.getFromXml(job1.getPayload());
     Assert.assertEquals(MimeType.mimeType("application","x-mpegURL"), mpe.getMimeType());
     Assert.assertEquals(MediaPackageElement.Type.Track, mpe.getElementType());
-    Assert.assertEquals(new URI(UrlSupport.concat(service.serviceUrl, mp.getIdentifier().compact(), "track-aac", "media.m3u8")), mpe.getURI());
+    Assert.assertEquals(new URI(UrlSupport.concat(service.serviceUrl, mp.getIdentifier().compact(), "track-aac", "media.aac.m3u8")), mpe.getURI());
   }
 
   @Test
@@ -211,14 +211,14 @@ public class HLSDistributionServiceImplTest {
     Assert.assertTrue(mpDir.exists());
     File mediaDir = new File(mpDir, "track-h264");
     Assert.assertTrue(mediaDir.exists());
-    Assert.assertTrue(new File(mediaDir, "media.m3u8").exists()); // HLS playlist should have been created
-    Assert.assertTrue(new File(mediaDir, "media-000.ts").exists()); // HLS segment files should have been created
+    Assert.assertTrue(new File(mediaDir, "media.mov.m3u8").exists()); // HLS playlist should have been created
+    Assert.assertTrue(new File(mediaDir, "media.mov-000.ts").exists()); // HLS segment files should have been created
 
     //Test that the HLS playlist was added as a delivery track
     MediaPackageElement mpe = MediaPackageElementParser.getFromXml(job1.getPayload());
     Assert.assertEquals(MimeType.mimeType("application","x-mpegURL"), mpe.getMimeType());
     Assert.assertEquals(MediaPackageElement.Type.Track, mpe.getElementType());
-    Assert.assertEquals(new URI(UrlSupport.concat(service.serviceUrl, mp.getIdentifier().compact(), "track-h264", "media.m3u8")), mpe.getURI());
+    Assert.assertEquals(new URI(UrlSupport.concat(service.serviceUrl, mp.getIdentifier().compact(), "track-h264", "media.mov.m3u8")), mpe.getURI());
   }
 
   public void testTrackRetract() throws Exception {
@@ -237,8 +237,8 @@ public class HLSDistributionServiceImplTest {
     File mpDir = new File(distributionRoot, mp.getIdentifier().compact());
     File mediaDir = new File(mpDir, "track-h264");
     Assert.assertTrue(mediaDir.exists());
-    Assert.assertTrue(new File(mediaDir, "media.m3u8").exists()); // HLS playlist should have been created
-    Assert.assertTrue(new File(mediaDir, "media-000.ts").exists()); // HLS segment files should have been created
+    Assert.assertTrue(new File(mediaDir, "media.mov.m3u8").exists()); // HLS playlist should have been created
+    Assert.assertTrue(new File(mediaDir, "media.mov-000.ts").exists()); // HLS segment files should have been created
 
     // Now retract the mediapackage and ensure that the distributed files have been removed
     Job job2 = service.retract(mp, element.getIdentifier());
@@ -256,8 +256,8 @@ public class HLSDistributionServiceImplTest {
     System.out.println("ElementDir: " + service.getDistributionFile(mp, mp.getElementById("track-h264")).getAbsolutePath());
     
     Assert.assertFalse(service.getDistributionFile(mp, mp.getElementById("track-h264")).isFile());
-    Assert.assertFalse(new File(mediaDir, "media.m3u8").exists()); // HLS playlist should have been deleted
-    Assert.assertFalse(new File(mediaDir, "media-000.ts").exists()); // HLS segment files should have been deleted
+    Assert.assertFalse(new File(mediaDir, "media.mov.m3u8").exists()); // HLS playlist should have been retracted
+    Assert.assertFalse(new File(mediaDir, "media.mov-000.ts").exists()); // HLS segment files should have been retracted
   }
 
   @Test
