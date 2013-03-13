@@ -34,6 +34,7 @@ import org.opencastproject.mediapackage.MediaPackageElement;
 import org.opencastproject.mediapackage.MediaPackageBuilder;
 import org.opencastproject.mediapackage.MediaPackageBuilderFactory;
 import org.opencastproject.mediapackage.MediaPackageElementParser;
+import org.opencastproject.mediapackage.MediaPackageParser;
 import org.opencastproject.security.api.DefaultOrganization;
 import org.opencastproject.security.api.Organization;
 import org.opencastproject.security.api.OrganizationDirectoryService;
@@ -220,7 +221,6 @@ public class HLSDistributionServiceImplTest {
     Assert.assertEquals(new URI(UrlSupport.concat(service.serviceUrl, mp.getIdentifier().compact(), "track-h264", "media.m3u8")), mpe.getURI());
   }
 
-  @Test
   public void testTrackRetract() throws Exception {
     int elementCount = mp.getElements().length;
 
@@ -230,7 +230,9 @@ public class HLSDistributionServiceImplTest {
     jobBarrier.waitForJobs();
 
     // Add the new elements to the mediapackage
-    mp.add(MediaPackageElementParser.getFromXml(job1.getPayload()));
+    MediaPackageElement element = MediaPackageElementParser.getFromXml(job1.getPayload());
+    mp.add(element);
+    System.out.println(MediaPackageElementParser.getAsXml(element));
 
     File mpDir = new File(distributionRoot, mp.getIdentifier().compact());
     File mediaDir = new File(mpDir, "track-h264");
@@ -239,19 +241,23 @@ public class HLSDistributionServiceImplTest {
     Assert.assertTrue(new File(mediaDir, "media-000.ts").exists()); // HLS segment files should have been created
 
     // Now retract the mediapackage and ensure that the distributed files have been removed
-    Job job2 = service.retract(mp, "track-h264");
+    Job job2 = service.retract(mp, element.getIdentifier());
     jobBarrier = new JobBarrier(serviceRegistry, 500, job2);
     jobBarrier.waitForJobs();
+    
+    System.out.println("Element ref: " + element.getReference());
+    System.out.println("DistributedDir: " + service.getDistributedFile(mp, element).getAbsolutePath());
 
     // Remove the distributed elements from the mediapackage
-    mp.remove(MediaPackageElementParser.getFromXml(job2.getPayload()));
+    mp.remove(element);
 
     Assert.assertEquals(elementCount, mp.getElements().length);
     Assert.assertNotNull(mp.getElementById("track-h264"));
-
+    System.out.println("ElementDir: " + service.getDistributionFile(mp, mp.getElementById("track-h264")).getAbsolutePath());
+    
     Assert.assertFalse(service.getDistributionFile(mp, mp.getElementById("track-h264")).isFile());
-    Assert.assertFalse(new File(mediaDir, "media.m3u8").exists()); // HLS playlist should have been created
-    Assert.assertFalse(new File(mediaDir, "media-000.ts").exists()); // HLS segment files should have been created
+    Assert.assertFalse(new File(mediaDir, "media.m3u8").exists()); // HLS playlist should have been deleted
+    Assert.assertFalse(new File(mediaDir, "media-000.ts").exists()); // HLS segment files should have been deleted
   }
 
   @Test

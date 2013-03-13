@@ -405,43 +405,26 @@ public class HLSDistributionServiceImpl extends AbstractJobProducer implements D
       throw new IllegalStateException("No element " + elementId + " found in mediapackage");
 
     // Find the element that has been created as part of the distribution process
-    String mediaPackageId = mediapackage.getIdentifier().compact();
-    URI distributedURI = null;
-    MediaPackageElement distributedElement = null;
-    try {
-      distributedURI = getDistributionUri(mediaPackageId, element);
-      for (MediaPackageElement e : mediapackage.getElements()) {
-        if (distributedURI.equals(e.getURI())) {
-          distributedElement = e;
-          break;
-        }
-      }
-    } catch (URISyntaxException e) {
-      throw new DistributionException("Retracted element produces an invalid URI", e);
-    }
-
-    // Has this element been distributed?
-    if (distributedElement == null)
-      return null;
-
     String mediapackageId = mediapackage.getIdentifier().compact();
+    URI distributedURI = null;
+    MediaPackageElement distributedElement = element;
     try {
-
       File mediapackageDir = getMediaPackageDirectory(mediapackageId);
-      File elementDir = getDistributionFile(mediapackage, element);
-
-      logger.info("Retracting element {} from {}", distributedElement, elementDir);
+      File elementDir = getDistributedFile(mediapackage, element);
 
       // Does the file exist? If not, the current element has not been distributed to this channel
       // or has been removed otherwise
       if (!elementDir.exists()) {
-        logger.warn("Unable to delete element from {}", elementDir);
-        return distributedElement;
+        throw new Exception("Track directory does not exist: " + elementDir.getAbsolutePath());
       }
 
       // Try to remove the file and - if possible - the parent folder
-      FileUtils.forceDelete(elementDir.getParentFile());
+      System.out.println("Removing track folder: " + elementDir.getAbsolutePath());
+      FileUtils.forceDelete(elementDir);
+      logger.info("Removed track folder: " + elementDir.getAbsolutePath());
+
       if (mediapackageDir.list().length == 0) {
+        logger.info("Removed parent folder since it is empty: " + mediapackageDir.getAbsolutePath());
         FileSupport.delete(mediapackageDir);
       }
 
@@ -456,7 +439,6 @@ public class HLSDistributionServiceImpl extends AbstractJobProducer implements D
         throw new DistributionException(e);
       }
     }
-
   }
 
   /**
@@ -509,6 +491,24 @@ public class HLSDistributionServiceImpl extends AbstractJobProducer implements D
     String destinationFileName = PathSupport.concat(new String[] { directoryName,
             mediaPackage.getIdentifier().compact(), elementId, fileName });
     return new File(destinationFileName);
+  }
+
+  /**
+   * Gets the distributed file from mediapackage information.
+   * 
+   * @param mediaPackage
+   *          the media package
+   * @param element
+   *          The mediapackage element being distributed
+   * @return The file to copy the content to
+   */
+  protected File getDistributedFile(MediaPackage mediaPackage, MediaPackageElement element) {
+    String elementUid = element.getReference().getIdentifier();
+
+    String directoryName = distributionDirectory.getAbsolutePath();
+    String distributedFileName = PathSupport.concat(new String[] { directoryName,
+            mediaPackage.getIdentifier().compact(), elementUid });
+    return new File(distributedFileName);
   }
 
   /**
