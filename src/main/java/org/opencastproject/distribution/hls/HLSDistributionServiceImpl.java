@@ -240,7 +240,7 @@ public class HLSDistributionServiceImpl extends AbstractJobProducer implements D
       
       final Map<String, String> commandLineOpts = new HashMap<String, String>();
       commandLineOpts.put("outputdir", destination.getAbsoluteFile().getParent());
-      commandLineOpts.put("outputname", FilenameUtils.getBaseName(destination.getName()));
+      commandLineOpts.put("outputname", FilenameUtils.getName(destination.getName()));
 
       try {
         engine = engine == null ? new FFmpegHLSEncoderEngine() : engine;
@@ -260,25 +260,7 @@ public class HLSDistributionServiceImpl extends AbstractJobProducer implements D
       distributedElement.setIdentifier(null);
 
       logger.info("Finished distribution of {}", element);
-      URI uri = distributedElement.getURI();
-      long now = 0L;
-      while (checkAvailability) {
-        HttpResponse response = trustedHttpClient.execute(new HttpHead(uri));
-        if (response.getStatusLine().getStatusCode() == HttpServletResponse.SC_OK)
-          break;
 
-        if (now < TIMEOUT) {
-          try {
-            Thread.sleep(INTERVAL);
-            now += INTERVAL;
-            continue;
-          } catch (Exception e) {
-            throw new RuntimeException(e);
-          }
-        }
-        logger.warn("Status code of distributed file {}: {}", uri, response.getStatusLine().getStatusCode());
-        throw new DistributionException("Unable to load distributed file " + uri.toString());
-      }
       return distributedElement;
     } catch (Exception e) {
       logger.warn("Error distributing " + element, e);
@@ -486,7 +468,7 @@ public class HLSDistributionServiceImpl extends AbstractJobProducer implements D
    */
   protected File getDistributionFile(MediaPackage mediaPackage, MediaPackageElement element) {
     String elementId = element.getIdentifier();
-    String fileName = FilenameUtils.getName(element.getURI().toString()) + ".m3u8";
+    String fileName = FilenameUtils.getBaseName(element.getURI().toString()) + ".m3u8";
     String directoryName = distributionDirectory.getAbsolutePath();
     String destinationFileName = PathSupport.concat(new String[] { directoryName,
             mediaPackage.getIdentifier().compact(), elementId, fileName });
