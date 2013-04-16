@@ -130,7 +130,7 @@ public class HLSDistributionServiceImplTest {
 
   @After
   public void tearDown() throws Exception {
-//    FileUtils.deleteDirectory(distributionRoot);
+    FileUtils.deleteDirectory(distributionRoot);
     ((ServiceRegistryInMemoryImpl) serviceRegistry).dispose();
   }
 

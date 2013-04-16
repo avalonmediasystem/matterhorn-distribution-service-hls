@@ -240,7 +240,7 @@ public class HLSDistributionServiceImpl extends AbstractJobProducer implements D
       
       final Map<String, String> commandLineOpts = new HashMap<String, String>();
       commandLineOpts.put("outputdir", destination.getAbsoluteFile().getParent());
-      commandLineOpts.put("outputname", FilenameUtils.getName(destination.getName()));
+      commandLineOpts.put("outputname", FilenameUtils.getBaseName(destination.getName()));
 
       try {
         engine = engine == null ? new FFmpegHLSEncoderEngine() : engine;
@@ -468,7 +468,7 @@ public class HLSDistributionServiceImpl extends AbstractJobProducer implements D
    */
   protected File getDistributionFile(MediaPackage mediaPackage, MediaPackageElement element) {
     String elementId = element.getIdentifier();
-    String fileName = FilenameUtils.getBaseName(element.getURI().toString()) + ".m3u8";
+    String fileName = FilenameUtils.getName(element.getURI().toString()) + ".m3u8";
     String directoryName = distributionDirectory.getAbsolutePath();
     String destinationFileName = PathSupport.concat(new String[] { directoryName,
             mediaPackage.getIdentifier().compact(), elementId, fileName });
