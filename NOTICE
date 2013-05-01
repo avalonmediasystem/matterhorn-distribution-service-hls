@@ -1,4 +1,3 @@
-Avalon Media System
+Opencast Matterhorn and modifications to it are licensed under the Educational Community License, v. 2.0, as specified in the original Matterhorn distribution: https://opencast.jira.com/svn/MH/tags/1.3.1/docs/licenses.txt .
 
-Copyright 2011-2013 The Trustees of Indiana University and
-Northwestern University
+Files in this repository have been modified from the original distribution. Modifications Copyright 2013 The Trustees of Indiana University and Northwestern University. Modified files are noted in the header of each file.
