@@ -60,36 +60,40 @@ public class FFmpegHLSEncoderEngine extends FFmpegEncoderEngine {
       List<File> files = new ArrayList<File>();
       files.add(m3u8);
 
-      BufferedReader br = new BufferedReader(new FileReader(m3u8));
       if (!destination.getParentFile().exists()) {
         destination.mkdirs();
       }
-      PrintWriter pw = new PrintWriter(new FileWriter(destination));
 
-      String line = null;
+      PrintWriter pw = null;
+      BufferedReader br = new BufferedReader(new FileReader(m3u8));
+      try {
+          pw = new PrintWriter(new FileWriter(destination));
+          String line = null;
 
-      //Read from the original file and write to the new
-      //unless content matches data to be removed.
-      final String oldName = m3u8.getName().replace(".m3u8", "");
-      final String newName = destination.getName().replace(".m3u8", "");
-      while ((line = br.readLine()) != null) {
-          if (line.startsWith(m3u8.getParentFile().getPath())) {
-              File oldFile = new File(line);
-              File newFile = new File(destination.getParentFile(), oldFile.getName().replace(oldName, newName));
-              if (!oldFile.renameTo(newFile)) {
-                  throw new EncoderException("Could not rename segment file!");
+          //Read from the original file and write to the new
+          //unless content matches data to be removed.
+          final String oldName = m3u8.getName().replace(".m3u8", "");
+          final String newName = destination.getName().replace(".m3u8", "");
+          while ((line = br.readLine()) != null) {
+              if (line.startsWith(m3u8.getParentFile().getPath())) {
+                  File oldFile = new File(line);
+                  File newFile = new File(destination.getParentFile(), oldFile.getName().replace(oldName, newName));
+                  if (!oldFile.renameTo(newFile)) {
+                      throw new EncoderException("Could not rename segment file!");
+                  }
+                  pw.println(newFile.getName());
+              } else {
+                  pw.println(line);
               }
-              pw.println(newFile.getName());
-          } else {
-              pw.println(line);
           }
+      } finally {
+          if (pw != null) pw.close();
+          br.close();
       }
-      pw.close();
-      br.close();
 
       //Delete the original file
       if (!m3u8.delete())
-          throw new EncoderException("Could not delete origin m3u8 file");
+         throw new EncoderException("Could not delete origin m3u8 file");
 
       return files;
     }
