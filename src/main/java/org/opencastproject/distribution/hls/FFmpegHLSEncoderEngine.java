@@ -24,23 +24,16 @@ package org.opencastproject.distribution.hls;
 import org.opencastproject.composer.api.EncoderException;
 import org.opencastproject.composer.api.EncodingProfile;
 import org.opencastproject.composer.impl.ffmpeg.FFmpegEncoderEngine;
-import org.opencastproject.util.data.Option;
-
 import org.osgi.service.component.ComponentContext;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.BufferedReader;
-import java.io.FileReader;
 import java.io.File;
+import java.io.FileReader;
 import java.io.FileWriter;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * Implementation for the encoder engine backed by ffmpeg.
@@ -57,56 +50,53 @@ public class FFmpegHLSEncoderEngine extends FFmpegEncoderEngine {
   public void activate(ComponentContext cc) {
     super.activate(cc);
   }
- 
-  public Option<File> encode(File mediaSource, EncodingProfile format, Map<String, String> properties) throws EncoderException {
-    super.encode(mediaSource, format, properties);
-    File m3u8 = getOutputFile(mediaSource, format); 
-    File tempFile = null;
- 
-    // Modify the m3u8 file to contain file names instead of absolute paths to such files
-    try {
 
-      //Construct the new file that will later be renamed to the original filename. 
-      tempFile = new File(m3u8.getAbsolutePath() + ".tmp");
-      
+    /**
+     * Updates the passed playlist file to make all the files relative and returns
+     * a List of File objects that includes the playlist itseslf and all of the
+     * segments referenced in the playlist.
+     */
+  public static List<File> relitiviseAndMovePlaylist(File m3u8, File destination) throws IOException, EncoderException {
+      List<File> files = new ArrayList<File>();
+      files.add(m3u8);
+
       BufferedReader br = new BufferedReader(new FileReader(m3u8));
-      PrintWriter pw = new PrintWriter(new FileWriter(tempFile));
-      
+      if (!destination.getParentFile().exists()) {
+        destination.mkdirs();
+      }
+      PrintWriter pw = new PrintWriter(new FileWriter(destination));
+
       String line = null;
 
-      //Read from the original file and write to the new 
+      //Read from the original file and write to the new
       //unless content matches data to be removed.
+      final String oldName = m3u8.getName().replace(".m3u8", "");
+      final String newName = destination.getName().replace(".m3u8", "");
       while ((line = br.readLine()) != null) {
-        String pattern = "\\/.*\\/";
-        pw.println(line.replaceAll(pattern, ""));
-        pw.flush();
+          if (line.startsWith(m3u8.getParentFile().getPath())) {
+              File oldFile = new File(line);
+              File newFile = new File(destination.getParentFile(), oldFile.getName().replace(oldName, newName));
+              if (!oldFile.renameTo(newFile)) {
+                  throw new EncoderException("Could not rename segment file!");
+              }
+              pw.println(newFile.getName());
+          } else {
+              pw.println(line);
+          }
       }
       pw.close();
       br.close();
-      
+
       //Delete the original file
       if (!m3u8.delete())
-        throw new EncoderException("Could not delete origin m3u8 file");
-      
-      //Rename the new file to the filename the original file had.
-      if (!tempFile.renameTo(m3u8))
-        throw new EncoderException("Could not rename m3u8 tempfile");
-    }
-    catch (FileNotFoundException ex) {
-      ex.printStackTrace();
-    }
-    catch (IOException ex) {
-      ex.printStackTrace();
-    }
+          throw new EncoderException("Could not delete origin m3u8 file");
 
-    return Option.some(tempFile);
-  }
+      return files;
+    }
 
   /**
-   * {@inheritDoc}
-   * 
-   * @see org.opencastproject.composer.impl.FFmpegEncoderEngine#getOutputFile(java.io.File,
-   *      org.opencastproject.composer.api.EncodingProfile)
+   * Because this implementation technically has several output files, this
+   * method shouldn't be used, and the superclass implementation won't work.
    */
   @Override
   protected File getOutputFile(File source, EncodingProfile profile) {

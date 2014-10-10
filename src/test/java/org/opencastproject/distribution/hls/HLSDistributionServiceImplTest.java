@@ -47,6 +47,8 @@ import org.opencastproject.util.MimeType;
 import org.opencastproject.util.PathSupport;
 import org.opencastproject.util.UrlSupport;
 import org.opencastproject.workspace.api.Workspace;
+import org.osgi.framework.BundleContext;
+import org.osgi.service.component.ComponentContext;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.BufferedReader;
@@ -115,10 +117,17 @@ public class HLSDistributionServiceImplTest {
             organizationDirectoryService);
     service.setServiceRegistry(serviceRegistry);
     service.setTrustedHttpClient(httpClient);
-    service.distributionDirectory = distributionRoot;
     service.serviceUrl = UrlSupport.DEFAULT_BASE_URL;
     Workspace workspace = EasyMock.createNiceMock(Workspace.class);
     service.setWorkspace(workspace);
+    BundleContext bc = EasyMock.createNiceMock(BundleContext.class);
+    ComponentContext cc = EasyMock.createNiceMock(ComponentContext.class);
+    EasyMock.expect(bc.getProperty("org.opencastproject.hls.url")).andReturn(distributionRoot.toURI().toString());
+    EasyMock.expect(bc.getProperty("org.opencastproject.hls.directory")).andReturn(distributionRoot.getAbsolutePath());
+    EasyMock.expect(cc.getBundleContext()).andReturn(bc).anyTimes();
+    EasyMock.replay(cc);
+    EasyMock.replay(bc);
+    service.activate(cc);
 
     final File mediaMOV = new File(mediaPackageRoot, "media.mov");
     EasyMock.expect(workspace.get(mediaMOV.toURI())).andReturn(mediaMOV);
@@ -230,11 +239,6 @@ public class HLSDistributionServiceImplTest {
 
         // Distribute only some of the elements in the mediapackage
         Job job1 = service.distribute(mp, "track-h264"); // "track-h264" should be distributed
-
-        // The following line, when uncommented, makes the tests pass, implying the
-        // problem is related to concurrency.
-        // new JobBarrier(serviceRegistry, 500, job1).waitForJobs();
-
         Job job2 = service.distribute(mp, "track-aac");
         JobBarrier jobBarrier = new JobBarrier(serviceRegistry, 500, job1, job2);
 
