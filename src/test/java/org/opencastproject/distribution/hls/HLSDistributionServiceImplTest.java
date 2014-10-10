@@ -34,7 +34,6 @@ import org.opencastproject.mediapackage.MediaPackageElement;
 import org.opencastproject.mediapackage.MediaPackageBuilder;
 import org.opencastproject.mediapackage.MediaPackageBuilderFactory;
 import org.opencastproject.mediapackage.MediaPackageElementParser;
-import org.opencastproject.mediapackage.MediaPackageParser;
 import org.opencastproject.security.api.DefaultOrganization;
 import org.opencastproject.security.api.Organization;
 import org.opencastproject.security.api.OrganizationDirectoryService;
@@ -48,14 +47,16 @@ import org.opencastproject.util.MimeType;
 import org.opencastproject.util.PathSupport;
 import org.opencastproject.util.UrlSupport;
 import org.opencastproject.workspace.api.Workspace;
+import org.osgi.framework.BundleContext;
+import org.osgi.service.component.ComponentContext;
 
 import javax.servlet.http.HttpServletResponse;
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
-import java.net.URL;
-import java.util.Map;
-import java.util.HashMap;
 
 public class HLSDistributionServiceImplTest {
 
@@ -116,15 +117,28 @@ public class HLSDistributionServiceImplTest {
             organizationDirectoryService);
     service.setServiceRegistry(serviceRegistry);
     service.setTrustedHttpClient(httpClient);
-    service.distributionDirectory = distributionRoot;
     service.serviceUrl = UrlSupport.DEFAULT_BASE_URL;
     Workspace workspace = EasyMock.createNiceMock(Workspace.class);
     service.setWorkspace(workspace);
+    BundleContext bc = EasyMock.createNiceMock(BundleContext.class);
+    ComponentContext cc = EasyMock.createNiceMock(ComponentContext.class);
+    EasyMock.expect(bc.getProperty("org.opencastproject.hls.url")).andReturn(distributionRoot.toURI().toString());
+    EasyMock.expect(bc.getProperty("org.opencastproject.hls.directory")).andReturn(distributionRoot.getAbsolutePath());
+    EasyMock.expect(cc.getBundleContext()).andReturn(bc).anyTimes();
+    EasyMock.replay(cc);
+    EasyMock.replay(bc);
+    service.activate(cc);
 
-    EasyMock.expect(workspace.get((URI) EasyMock.anyObject())).andReturn(new File(mediaPackageRoot, "media.mov"));
-    EasyMock.expect(workspace.get((URI) EasyMock.anyObject())).andReturn(new File(mediaPackageRoot, "dublincore.xml"));
-    EasyMock.expect(workspace.get((URI) EasyMock.anyObject())).andReturn(new File(mediaPackageRoot, "mpeg7.xml"));
-    EasyMock.expect(workspace.get((URI) EasyMock.anyObject())).andReturn(new File(mediaPackageRoot, "attachment.txt"));
+    final File mediaMOV = new File(mediaPackageRoot, "media.mov");
+    EasyMock.expect(workspace.get(mediaMOV.toURI())).andReturn(mediaMOV);
+    final File mediaAAC = new File(mediaPackageRoot, "media.aac");
+    EasyMock.expect(workspace.get(mediaAAC.toURI())).andReturn(mediaAAC);
+    final File dcXML = new File(mediaPackageRoot, "dublincore.xml");
+    EasyMock.expect(workspace.get(dcXML.toURI())).andReturn(dcXML);
+    final File mpeg7XML= new File(mediaPackageRoot, "mpeg7.xml");
+    EasyMock.expect(workspace.get(mpeg7XML.toURI())).andReturn(mpeg7XML);
+    final File attachmentTXT = new File(mediaPackageRoot, "attachment.txt");
+    EasyMock.expect(workspace.get(attachmentTXT.toURI())).andReturn(attachmentTXT);
     EasyMock.replay(workspace);
   }
 
@@ -184,7 +198,6 @@ public class HLSDistributionServiceImplTest {
     Job job1 = service.distribute(mp, "track-aac"); // "track-aac" should be distributed
     JobBarrier jobBarrier = new JobBarrier(serviceRegistry, 500, job1);
     jobBarrier.waitForJobs();
-
     File mpDir = new File(distributionRoot, mp.getIdentifier().compact());
     Assert.assertTrue(mpDir.exists());
     File mediaDir = new File(mpDir, "track-aac");
@@ -221,7 +234,32 @@ public class HLSDistributionServiceImplTest {
     Assert.assertEquals(new URI(UrlSupport.concat(service.serviceUrl, mp.getIdentifier().compact(), "track-h264", "media.mov.m3u8")), mpe.getURI());
   }
 
-  public void testTrackRetract() throws Exception {
+    @Test
+    public void testRelativePathGeneration() throws Exception {
+
+        // Distribute only some of the elements in the mediapackage
+        Job job1 = service.distribute(mp, "track-h264"); // "track-h264" should be distributed
+        Job job2 = service.distribute(mp, "track-aac");
+        JobBarrier jobBarrier = new JobBarrier(serviceRegistry, 500, job1, job2);
+
+        JobBarrier.Result r = jobBarrier.waitForJobs();
+        Assert.assertTrue("Jobs must succeed!", r.isSuccess());
+
+        final File mpDir = new File(distributionRoot, mp.getIdentifier().compact());
+        assertPlaylistHasOnlyRelativePaths(new File(new File(mpDir, "track-h264"), "media.mov.m3u8"));
+        assertPlaylistHasOnlyRelativePaths(new File(new File(mpDir, "track-aac"), "media.aac.m3u8"));
+    }
+
+    private void assertPlaylistHasOnlyRelativePaths(File file) throws IOException {
+        BufferedReader reader = new BufferedReader(new FileReader(file));
+        final String parentPath = file.getParentFile().getPath();
+        String line = null;
+        while ((line = reader.readLine()) != null) {
+            Assert.assertEquals("Playlist file \"" + file + "\" has must have relative paths! (has \"" + line + "\")", false, line.startsWith(parentPath));
+        }
+    }
+
+    public void testTrackRetract() throws Exception {
     int elementCount = mp.getElements().length;
 
     // Distribute the mediapackage and all of its elements
