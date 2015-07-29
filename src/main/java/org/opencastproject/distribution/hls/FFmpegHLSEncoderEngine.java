@@ -61,7 +61,7 @@ public class FFmpegHLSEncoderEngine extends FFmpegEncoderEngine {
       files.add(m3u8);
 
       if (!destination.getParentFile().exists()) {
-        destination.mkdirs();
+        destination.getParentFile().mkdirs();
       }
 
       PrintWriter pw = null;
