@@ -61,7 +61,10 @@ public class FFmpegHLSEncoderEngine extends FFmpegEncoderEngine {
       files.add(m3u8);
 
       if (!destination.getParentFile().exists()) {
-        destination.mkdirs();
+        // Stefan Harsan Farr
+        // fix bug. destination.mkdirs(); was creating a directory with the file name
+        // instead of making sure the parent directory is created.
+        destination.getParentFile().mkdirs();
       }
 
       PrintWriter pw = null;
