@@ -1,5 +1,5 @@
 /*
- * This file has been modified from the original distribution. 
+ * This file has been modified from the original distribution.
  * Modifications Copyright 2013 The Trustees of Indiana University and Northwestern University.
  */
 
@@ -25,6 +25,8 @@ import org.opencastproject.composer.api.EncoderException;
 import org.opencastproject.composer.api.EncodingProfile;
 import org.opencastproject.composer.impl.ffmpeg.FFmpegEncoderEngine;
 import org.osgi.service.component.ComponentContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -40,13 +42,16 @@ import java.util.List;
  */
 public class FFmpegHLSEncoderEngine extends FFmpegEncoderEngine {
 
+  /** Logging facility */
+  private static final Logger logger = LoggerFactory.getLogger(FFmpegHLSEncoderEngine.class);
+
   /**
    * Creates the ffmpeg encoder engine.
    */
   public FFmpegHLSEncoderEngine() {
     super();
   }
- 
+
   public void activate(ComponentContext cc) {
     super.activate(cc);
   }
@@ -81,6 +86,15 @@ public class FFmpegHLSEncoderEngine extends FFmpegEncoderEngine {
               if (line.startsWith(m3u8.getParentFile().getPath())) {
                   File oldFile = new File(line);
                   File newFile = new File(destination.getParentFile(), oldFile.getName().replace(oldName, newName));
+                  logger.debug("Renaming " + oldFile + " to " + newFile);
+                  if (!oldFile.renameTo(newFile)) {
+                      throw new EncoderException("Could not rename segment file!");
+                  }
+                  pw.println(newFile.getName());
+              } else if (line.endsWith(".ts")) {
+                  File oldFile = new File(m3u8.getParentFile(), line);
+                  File newFile = new File(destination.getParentFile(), oldFile.getName().replace(oldName, newName));
+                  logger.debug("Renaming " + oldFile + " to " + newFile);
                   if (!oldFile.renameTo(newFile)) {
                       throw new EncoderException("Could not rename segment file!");
                   }
@@ -120,4 +134,3 @@ public class FFmpegHLSEncoderEngine extends FFmpegEncoderEngine {
     return outputFile;
   }
 }
-

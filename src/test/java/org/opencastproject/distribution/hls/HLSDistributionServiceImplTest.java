@@ -193,7 +193,7 @@ public class HLSDistributionServiceImplTest {
 
   @Test
   public void testAudioDistribution() throws Exception {
-    
+
     // Distribute only some of the elements in the mediapackage
     Job job1 = service.distribute(mp, "track-aac"); // "track-aac" should be distributed
     JobBarrier jobBarrier = new JobBarrier(serviceRegistry, 500, job1);
@@ -255,7 +255,7 @@ public class HLSDistributionServiceImplTest {
         final String parentPath = file.getParentFile().getPath();
         String line = null;
         while ((line = reader.readLine()) != null) {
-            Assert.assertEquals("Playlist file \"" + file + "\" has must have relative paths! (has \"" + line + "\")", false, line.startsWith(parentPath));
+            Assert.assertEquals("Playlist file \"" + file + "\" must have relative paths! (has \"" + line + "\")", false, line.startsWith(parentPath));
         }
     }
 
@@ -282,7 +282,7 @@ public class HLSDistributionServiceImplTest {
     Job job2 = service.retract(mp, element.getIdentifier());
     jobBarrier = new JobBarrier(serviceRegistry, 500, job2);
     jobBarrier.waitForJobs();
-    
+
     System.out.println("Element ref: " + element.getReference());
     System.out.println("DistributedDir: " + service.getDistributedFile(mp, element).getAbsolutePath());
 
@@ -292,7 +292,7 @@ public class HLSDistributionServiceImplTest {
     Assert.assertEquals(elementCount, mp.getElements().length);
     Assert.assertNotNull(mp.getElementById("track-h264"));
     System.out.println("ElementDir: " + service.getDistributionFile(mp, mp.getElementById("track-h264")).getAbsolutePath());
-    
+
     Assert.assertFalse(service.getDistributionFile(mp, mp.getElementById("track-h264")).isFile());
     Assert.assertFalse(new File(mediaDir, "media.mov.m3u8").exists()); // HLS playlist should have been retracted
     Assert.assertFalse(new File(mediaDir, "media.mov-000.ts").exists()); // HLS segment files should have been retracted
